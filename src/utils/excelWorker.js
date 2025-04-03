@@ -178,7 +178,7 @@ function getSheetBlockData(result, sheetName, blockId) {
   const sheet = result.sheets[sheetName];
   const blocks = splitDataIntoBlocks(sheet.data, {
     maxBlocks: 100,
-    minBlockSize: 1000,
+    minBlockSize: 500,
     overlapRows: 10
   });
   
@@ -199,7 +199,7 @@ function splitDataIntoBlocks(data, options = {}) {
   
   const totalRows = data.length;
   const maxBlocks = options.maxBlocks || 100;
-  const minBlockSize = options.minBlockSize || 1000;
+  const minBlockSize = options.minBlockSize || 500;
   const overlapRows = options.overlapRows || 10;
   
   // 计算理想块大小

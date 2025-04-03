@@ -2,6 +2,9 @@
  * 请求状态管理和中断处理的公共函数
  */
 
+// 导入API配置
+import { API_CONFIG } from './config.js';
+
 /**
  * 创建请求控制器
  * @returns {Object} 请求控制对象，包含控制器和中断函数
@@ -216,8 +219,8 @@ export const stopStreamResponse = async (taskId, userId) => {
 
     try {
         // 使用统一的API配置
-        const baseURL = 'http://192.168.79.122:8083/v1';
-        const apiKey = 'app-YOAMLoFfLI87wasZke1PN4V5';
+        const baseURL = API_CONFIG.baseURL;
+        const apiKey = API_CONFIG.apiKey;
         
         console.log('[Stream Stop] 发送停止请求到:', `${baseURL}/chat-messages/${taskId}/stop`);
         

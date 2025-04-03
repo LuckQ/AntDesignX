@@ -5,14 +5,17 @@ import {
     getServerConversationHistory as getConversationHistory
 } from './chat.js';
 
+// 导入API配置
+import { API_CONFIG } from './config.js';
+
 /**
  * 模型配置
  */
 export const modelConfig = {
     'dify-api': {
         instance: {
-            baseURL: 'http://192.168.79.122:8083/v1',
-            apiKey: 'app-YOAMLoFfLI87wasZke1PN4V5',
+            baseURL: API_CONFIG.baseURL,
+            apiKey: API_CONFIG.apiKey,
             dangerouslyAllowBrowser: true
         },
         description: 'Dify API 模型'

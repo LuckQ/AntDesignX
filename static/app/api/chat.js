@@ -2,11 +2,8 @@
  * 聊天历史管理和消息处理的公共函数
  */
 
-// 统一的API配置
-const MODEL_CONFIG = {
-    baseURL: 'http://192.168.79.122:8083/v1',
-    apiKey: 'app-YOAMLoFfLI87wasZke1PN4V5'
-};
+// 导入API配置
+import { API_CONFIG } from './config.js';
 
 /**
  * 确保用户ID存在
@@ -35,7 +32,7 @@ export const getServerConversations = async (options = {}) => {
         const userId = ensureUserId();
 
         // 构建URL参数
-        const url = new URL(`${MODEL_CONFIG.baseURL}/conversations`);
+        const url = new URL(`${API_CONFIG.baseURL}/conversations`);
 
         // 添加用户ID，必选参数
         url.searchParams.append('user', userId);
@@ -57,7 +54,7 @@ export const getServerConversations = async (options = {}) => {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${MODEL_CONFIG.apiKey}`
+                'Authorization': `Bearer ${API_CONFIG.apiKey}`
             }
         });
 
@@ -133,7 +130,7 @@ export const getServerConversationHistory = async (conversationId, options = {})
 
         const { page = 1, pageSize = 20 } = options;
 
-        const url = new URL(`${MODEL_CONFIG.baseURL}/messages`);
+        const url = new URL(`${API_CONFIG.baseURL}/messages`);
         url.searchParams.append('conversation_id', conversationId);
         url.searchParams.append('user', userId);
         url.searchParams.append('page', page);
@@ -143,7 +140,7 @@ export const getServerConversationHistory = async (conversationId, options = {})
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${MODEL_CONFIG.apiKey}`
+                'Authorization': `Bearer ${API_CONFIG.apiKey}`
             }
         });
 
@@ -430,11 +427,11 @@ export const renameConversation = async (conversationId, options = {}) => {
             requestBody.name = options.name;
         }
 
-        const response = await fetch(`${MODEL_CONFIG.baseURL}/conversations/${conversationId}/name`, {
+        const response = await fetch(`${API_CONFIG.baseURL}/conversations/${conversationId}/name`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${MODEL_CONFIG.apiKey}`
+                'Authorization': `Bearer ${API_CONFIG.apiKey}`
             },
             body: JSON.stringify(requestBody)
         });
@@ -466,11 +463,11 @@ export const deleteConversation = async (conversationId) => {
             user: userId,
         };
 
-        const response = await fetch(`${MODEL_CONFIG.baseURL}/conversations/${conversationId}`, {
+        const response = await fetch(`${API_CONFIG.baseURL}/conversations/${conversationId}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${MODEL_CONFIG.apiKey}`
+                'Authorization': `Bearer ${API_CONFIG.apiKey}`
             },
             body: JSON.stringify(requestBody)
         });
@@ -553,14 +550,14 @@ export const getSuggestedQuestions = async (messageId) => {
     try {
         const userId = ensureUserId();
         
-        const url = new URL(`${MODEL_CONFIG.baseURL}/messages/${messageId}/suggested`);
+        const url = new URL(`${API_CONFIG.baseURL}/messages/${messageId}/suggested`);
         url.searchParams.append('user', userId);
         
         const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${MODEL_CONFIG.apiKey}`
+                'Authorization': `Bearer ${API_CONFIG.apiKey}`
             }
         });
 

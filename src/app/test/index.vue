@@ -105,7 +105,7 @@ const processingMessage = ref('');
 // 分块配置
 const blockOptions = {
     maxBlocks: 100,        // 最大分块数量
-    minBlockSize: 1000,    // 最小块大小
+    minBlockSize: 500,    // 最小块大小
     overlapRows: 10        // 重叠行数
 };
 
