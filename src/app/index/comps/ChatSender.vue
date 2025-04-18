@@ -1,36 +1,32 @@
 <template>
   <div class="chat-sender">
-    <!-- 上传文件项展示 -->
-    <div class="uploaded-files" v-if="uploadedFiles.length > 0">
-      <div class="files-scroll-container">
-        <t-tag v-for="(file, index) in uploadedFiles" :key="index" theme="default" variant="light" shape="round"
-          size="medium" class="file-tag">
-          <t-icon :name="getFileIcon(file.extension)" class="file-icon" />
-          <span class="file-name">{{ formatFileName(file.name) }}</span>
-          <t-button theme="default" variant="text" size="small" class="close-btn" @click="removeFile(index)">
-            <t-icon name="close" />
-          </t-button>
-        </t-tag>
-      </div>
-    </div>
-
     <div class="input-container">
-      <div class="attach-button-wrapper">
-        <input type="file" ref="fileInput" @change="handleFileSelected" class="file-input"
-          accept=".txt,.md,.mdx,.pdf,.html,.xlsx,.xls,.docx,.csv,.htm,.markdown" />
-        <t-button v-if="!isUploading" theme="default" variant="text" class="attachment-btn" @click="triggerFileInput">
-          <template #icon><t-icon name="attach" size="22px" /></template>
-        </t-button>
-        <div v-else class="loading-container">
-          <t-progress theme="circle" size="40" :percentage="uploadProgress"
-            :color="{ from: '#108ee9', to: '#87d068' }" />
-        </div>
+      <!-- 隐藏的文件输入框 -->
+      <input type="file" ref="fileInput" @change="handleFileSelected" class="file-input"
+        accept=".txt,.md,.mdx,.pdf,.html,.xlsx,.xls,.docx,.csv,.htm,.markdown" />
+        
+      <custom-chat-input
+        v-model="query"
+        :stop-disabled="loading"
+        :loading="loading || isUploading"
+        :uploading-file="isUploading"
+        :uploaded-files="uploadedFiles"
+        :textarea-props="{
+          placeholder: '请输入消息...',
+          class: 'custom-textarea'
+        }"
+        @send="handleSend"
+        @stop="handleStop"
+        @attach-click="triggerFileInput"
+        @remove-file="removeFile"
+      >
+      </custom-chat-input>
+      
+      <!-- 上传进度显示 -->
+      <div v-if="isUploading" class="upload-progress-overlay">
+        <t-progress theme="circle" size="40" :percentage="uploadProgress"
+          :color="{ from: '#108ee9', to: '#87d068' }" />
       </div>
-      <t-chat-input v-model="query" :stop-disabled="loading" :textarea-props="{
-        placeholder: '请输入消息...',
-        class: 'custom-textarea'
-      }" @send="handleSend" @stop="handleStop" autosize>
-      </t-chat-input>
     </div>
   </div>
 </template>
@@ -38,7 +34,8 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
 import { MessagePlugin, DialogPlugin, Progress as TProgress, Tag as TTag, Space as TSpace, Button as TButton } from 'tdesign-vue-next';
-import { API_CONFIG } from '/static/app/api/config.js';
+import { API_CONFIG } from '/static/api/config.js';
+import CustomChatInput from './CustomChatInput.vue';
 
 const props = defineProps({
   loading: {
@@ -59,10 +56,10 @@ const uploadedFiles = ref<Array<{ id: string, name: string, size: number, extens
 const supportedExtensions = ['txt', 'md', 'mdx', 'pdf', 'html', 'xlsx', 'xls', 'docx', 'csv', 'htm', 'markdown'];
 
 // 最大文件大小(字节)
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // 最大文件数量
-const MAX_FILES = 3;
+const MAX_FILES = 10;
 
 // 文件类型映射
 const fileTypeMap = {
@@ -105,7 +102,7 @@ const handleSend = (value: string) => {
     extension: file.extension,
     size: file.size
   }));
-  
+
   emit('send', { message, files });
 
   // 清空已上传文件列表
@@ -166,7 +163,7 @@ const handleFileSelected = async (event: Event) => {
   }
 
   const file = files[0];
-  
+
   // 检查是否已达到最大文件数量
   if (uploadedFiles.value.length >= MAX_FILES) {
     MessagePlugin.warning(`最多只能上传${MAX_FILES}个附件`);
@@ -241,7 +238,7 @@ const handleFileSelected = async (event: Event) => {
     }
 
     const result = await response.json();
-    
+
     // 添加到上传文件列表
     uploadedFiles.value.push({
       id: result.id,
@@ -268,99 +265,18 @@ const handleFileSelected = async (event: Event) => {
 </script>
 
 <style lang="scss">
-@import '/static/app/styles/variables.scss';
+@import '/static/styles/variables.scss';
 
 .chat-sender {
-  padding: $comp-margin-s $comp-margin-xs 0;
+  padding: 0 $comp-margin-xs 0;
   display: flex;
   flex-direction: column;
-}
-
-.uploaded-files {
-  padding: 4px 0;
-  width: 100%;
-}
-
-.files-scroll-container {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
-  padding: 4px 8px;
-  white-space: nowrap;
-}
-
-/* 隐藏滚动条但保留功能 */
-.files-scroll-container::-webkit-scrollbar {
-  height: 4px;
-}
-
-.files-scroll-container::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-.file-tag {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 4px;
-  padding: 2px 6px 2px 10px;
-  background-color: var(--td-bg-color-container, $gray-color-1);
-  border-color: var(--td-component-border, $gray-color-3);
-  flex-shrink: 0;
-
-  .file-icon {
-    color: $success-color-7;
-    font-size: 16px;
-    margin-right: 6px;
-    flex-shrink: 0;
-  }
-
-  .file-name {
-    color: var(--td-text-color-primary, $font-gray-1);
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .close-btn {
-    width: 16px;
-    height: 16px;
-    margin-left: 8px;
-    padding: 0;
-    line-height: 1;
-    color: var(--td-text-color-secondary, $font-gray-3);
-
-    .t-icon {
-      font-size: 14px;
-    }
-
-    &:hover {
-      color: $error-color-6;
-      background: none;
-    }
-  }
 }
 
 .input-container {
   display: flex;
   align-items: center;
   position: relative;
-}
-
-.attach-button-wrapper {
-  position: absolute;
-  left: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .file-input {
@@ -371,41 +287,17 @@ const handleFileSelected = async (event: Event) => {
   z-index: -1;
 }
 
-.attachment-btn {
-  color: var(--td-text-color-placeholder, $font-gray-4);
-  font-size: 22px;
-  padding: 2px 4px;
-
-  &:hover {
-    color: $brand-color-6;
-  }
-}
-
-.loading-container {
-  width: 30px;
-  height: 30px;
+.upload-progress-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.btn {
-  color: var(--td-text-color-placeholder, $font-gray-4);
-  border: none;
-
-  &:hover {
-    color: $brand-color-6;
-    border: none;
-    background: none;
-  }
-}
-
-.t-chat__footer .t-chat__footer__content {
-  margin-top: 0 !important;
-}
-
-/* 增加左侧内边距，为附件按钮腾出空间 */
-.t-textarea__inner {
-  padding-left: 55px !important;
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+  z-index: 20;
 }
 </style>

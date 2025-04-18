@@ -15,7 +15,7 @@
 
 ```vue
 <style lang="scss">
-@use '/static/app/styles/index.scss';
+@use '/static//styles/index.scss';
 
 // 组件特定样式...
 </style>
@@ -27,7 +27,7 @@
 
 ```vue
 <style lang="scss">
-@use '/static/app/styles/variables.scss' as vars;
+@use '/static//styles/variables.scss' as vars;
 
 .my-component {
   color: vars.$brand-color;

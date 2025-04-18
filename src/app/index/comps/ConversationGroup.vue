@@ -4,15 +4,15 @@
         <t-list-item 
             v-for="conversation in conversations" 
             :key="conversation.id"
-            @click="$emit('select', conversation.id)"
+            @click="handleConversationSelect(conversation.id)"
             class="conversation-item"
-            :class="{ 'active': conversation.id === currentConversationId }"
+            :class="{ 'active': activeSection === 'chat' && conversation.id === currentConversationId }"
         >
             <t-icon name="chat" class="conversation-icon" />
             <span class="conversation-text">{{ getConversationTitle(conversation) }}</span>
             
-            <!-- 更多操作按钮及下拉菜单 -->
-            <t-dropdown @click="handleMenuClick($event, conversation.id)" trigger="click" :hide-after-click="false">
+            <!-- 更多操作按钮及下拉菜单 - 改为hover触发 -->
+            <t-dropdown @click="handleMenuClick($event, conversation.id)" trigger="hover" :hide-after-click="false">
                 <t-button 
                     variant="text" 
                     shape="circle" 
@@ -64,11 +64,15 @@ const props = defineProps({
     currentConversationId: {
         type: String,
         default: ''
+    },
+    activeSection: {
+        type: String,
+        default: 'chat'
     }
 });
 
 // 定义事件
-const emit = defineEmits(['select', 'pin-conversation', 'rename-conversation', 'delete-conversation']);
+const emit = defineEmits(['select', 'pin-conversation', 'rename-conversation', 'delete-conversation', 'chat-section']);
 
 // 处理菜单点击
 const handleMenuClick = (data, conversationId) => {
@@ -118,10 +122,17 @@ const getConversationTitle = (conversation, maxLength = 20) => {
     // 如果没有名称和最近消息，使用ID的一部分
     return `对话 ${conversation.id.substring(0, 8)}...`;
 };
+
+// 处理会话选择
+const handleConversationSelect = (conversationId) => {
+    emit('select', conversationId);
+    // 添加切换到聊天区域事件
+    emit('chat-section');
+};
 </script>
 
 <style lang="scss" scoped>
-@import '/static/app/styles/variables.scss';
+@import '/static/styles/variables.scss';
 
 /* 对话列表抽屉样式 */
 .conversation-group {
@@ -138,7 +149,6 @@ const getConversationTitle = (conversation, maxLength = 20) => {
         background-color: $bg-color-container;
         z-index: 10;
         backdrop-filter: blur(5px);
-        border-bottom: 1px solid $component-stroke;
     }
 }
 
@@ -153,6 +163,11 @@ const getConversationTitle = (conversation, maxLength = 20) => {
     
     &:hover {
         background-color: $bg-color-container-hover;
+        
+        .more-btn {
+            opacity: 1;
+            visibility: visible;
+        }
     }
     
     &.active {
@@ -161,6 +176,11 @@ const getConversationTitle = (conversation, maxLength = 20) => {
         
         .conversation-icon {
             color: $brand-color;
+        }
+        
+        .more-btn {
+            opacity: 1;
+            visibility: visible;
         }
     }
     
@@ -177,9 +197,10 @@ const getConversationTitle = (conversation, maxLength = 20) => {
     }
     
     .more-btn {
-        opacity: 1;
+        opacity: 0;
+        visibility: hidden; /* 增加可见性属性，提升过渡效果 */
         color: $text-color-secondary;
-        transition: all 0.3s ease;
+        transition: all 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
         
         &:hover {
             color: $text-color-primary;

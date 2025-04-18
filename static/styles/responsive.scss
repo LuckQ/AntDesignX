@@ -1,0 +1,75 @@
+/**
+ * 响应式设计工具和断点定义
+ */
+
+// 定义断点变量
+$breakpoints: (
+  "xs": 480px,
+  "sm": 768px,
+  "md": 992px,
+  "lg": 1200px,
+  "xl": 1600px
+);
+
+// 媒体查询工具 - 小于断点
+@mixin breakpoint-down($breakpoint) {
+  @if map-has-key($breakpoints, $breakpoint) {
+    @media (max-width: map-get($breakpoints, $breakpoint)) {
+      @content;
+    }
+  } @else {
+    @media (max-width: $breakpoint) {
+      @content;
+    }
+  }
+}
+
+// 媒体查询工具 - 大于断点
+@mixin breakpoint-up($breakpoint) {
+  @if map-has-key($breakpoints, $breakpoint) {
+    @media (min-width: map-get($breakpoints, $breakpoint)) {
+      @content;
+    }
+  } @else {
+    @media (min-width: $breakpoint) {
+      @content;
+    }
+  }
+}
+
+// 媒体查询工具 - 在两个断点之间
+@mixin breakpoint-between($lower, $upper) {
+  $lower-breakpoint: if(map-has-key($breakpoints, $lower), map-get($breakpoints, $lower), $lower);
+  $upper-breakpoint: if(map-has-key($breakpoints, $upper), map-get($breakpoints, $upper), $upper);
+
+  @media (min-width: $lower-breakpoint) and (max-width: $upper-breakpoint) {
+    @content;
+  }
+}
+
+// 响应式间距缩放器
+@mixin responsive-spacing($property, $value, $factor-sm: 0.75, $factor-xs: 0.5) {
+  #{$property}: $value;
+
+  @include breakpoint-down("sm") {
+    #{$property}: $value * $factor-sm;
+  }
+
+  @include breakpoint-down("xs") {
+    #{$property}: $value * $factor-xs;
+  }
+}
+
+// 响应式容器宽度
+@mixin container-width {
+  width: 70%;
+  max-width: 900px;
+
+  @include breakpoint-down("md") {
+    width: 85%;
+  }
+
+  @include breakpoint-down("sm") {
+    width: 95%;
+  }
+} 

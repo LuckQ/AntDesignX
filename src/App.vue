@@ -10,6 +10,7 @@
 <style>
 /* 全局样式 */
 .app-container {
+  overflow: hidden;
   width: 100%;
   height: 100vh;
   display: flex;

@@ -121,15 +121,23 @@ const extractThinkingContent = (content) => {
 /**
  * 获取服务器会话历史
  * @param {String} conversationId - 会话ID
- * @param {Object} options - 分页选项
- * @returns {Promise<Array>} 会话历史消息数组
+ * @param {Object} options - 选项
+ * @param {Number} options.page - 页码
+ * @param {Number} options.pageSize - 每页数量
+ * @param {AbortSignal} options.signal - 用于取消请求的信号
+ * @returns {Promise<Array>} 会话历史数组
  */
 export const getServerConversationHistory = async (conversationId, options = {}) => {
+    if (!conversationId) {
+        return [];
+    }
+
     try {
         const userId = ensureUserId();
-
+        
+        // 构建URL
         const { page = 1, pageSize = 20 } = options;
-
+        
         // 使用工具函数创建URL
         const url = createApiUrl('/messages');
         url.searchParams.append('conversation_id', conversationId);
@@ -142,7 +150,9 @@ export const getServerConversationHistory = async (conversationId, options = {})
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${API_CONFIG.apiKey}`
-            }
+            },
+            // 添加AbortController的signal支持
+            signal: options.signal,
         });
 
         if (!response.ok) {
@@ -151,87 +161,103 @@ export const getServerConversationHistory = async (conversationId, options = {})
         }
 
         const data = await response.json();
-
+        
         if (data && data.data && Array.isArray(data.data)) {
-            // 结果数组，将包含格式化后的消息
-            const formattedMessages = [];
-
-            // 分析服务器返回的每条消息
-            for (const msg of data.data) {
-                // 如果有query字段，创建用户消息
-                if (msg.query) {
-                    // 创建基本用户消息
-                    const userMessage = {
-                        avatar: 'https://tdesign.gtimg.com/site/avatar.jpg', // 用户头像
-                        name: '自己',
-                        datetime: new Date(msg.created_at * 1000).toLocaleString(),
-                        content: msg.query,
-                        role: 'user',
-                        id: msg.id + '_user'
-                    };
-                    
-                    // 如果有files字段，添加到用户消息中
-                    if (msg.files && Array.isArray(msg.files) && msg.files.length > 0) {
-                        userMessage.files = msg.files.map(file => ({
-                            id: file.id,
-                            filename: file.filename || file.name,
-                            type: file.type || 'document',
-                            size: file.size || 0,
-                            url: file.url || ''
-                        }));
-                    }
-                    
-                    // 如果有message_files字段，添加到用户消息中
-                    if (msg.message_files && Array.isArray(msg.message_files) && msg.message_files.length > 0) {
-                        if (!userMessage.files) {
-                            userMessage.files = [];
-                        }
-                        
-                        msg.message_files.forEach(file => {
-                            userMessage.files.push({
-                                id: file.id,
-                                filename: file.filename || file.name,
-                                type: file.type || 'document',
-                                size: file.size || 0,
-                                url: file.url || ''
-                            });
-                        });
-                    }
-                    
-                    formattedMessages.push(userMessage);
-                }
-
-                // 如果有answer字段，创建助手消息
-                if (msg.answer) {
-                    // 提取思考内容
-                    const { content, reasoning } = extractThinkingContent(msg.answer);
-
-                    // 创建基本助手消息
-                    const assistantMessage = {
-                        avatar: 'https://tdesign.gtimg.com/site/chat-avatar.png', // 助手头像
-                        name: 'TDesignAI',
-                        datetime: new Date(msg.created_at * 1000).toLocaleString(),
-                        content: content || '',
-                        role: 'assistant',
-                        ...(reasoning ? { reasoning } : {}), // 只有有思考内容时才添加
-                        id: msg.id + '_assistant'
-                    };
-                    
-                    formattedMessages.push(assistantMessage);
-                }
-            }
-
-            // 后端API是倒序返回的(最新的在前面)，但前端显示需要正序，所以需要反转
-            formattedMessages.reverse();
-
-            return formattedMessages;
-        } else {
-            return [];
+            // 转换服务器格式为应用程序格式
+            return convertServerMessagesToAppFormat(data.data, conversationId);
         }
-    } catch (error) {
-        console.error('获取会话历史失败:', error);
+        
         return [];
+    } catch (error) {
+        // AbortError是预期的错误，不用记录到控制台
+        if (error.name !== 'AbortError') {
+            console.error('获取服务器会话历史失败:', error);
+        }
+        
+        // 将AbortError继续抛出以便上层处理
+        throw error;
     }
+};
+
+/**
+ * 将服务器返回的消息格式转换为应用程序格式
+ * @param {Array} serverMessages - 服务器返回的消息数组
+ * @param {String} conversationId - 对话ID
+ * @returns {Array} 格式化后的消息数组
+ */
+const convertServerMessagesToAppFormat = (serverMessages, conversationId) => {
+    // 结果数组，将包含格式化后的消息
+    const formattedMessages = [];
+
+    // 分析服务器返回的每条消息
+    for (const msg of serverMessages) {
+        // 如果有query字段，创建用户消息
+        if (msg.query) {
+            // 创建基本用户消息
+            const userMessage = {
+                avatar: 'https://tdesign.gtimg.com/site/avatar.jpg', // 用户头像
+                name: '自己',
+                datetime: new Date(msg.created_at * 1000).toLocaleString(),
+                content: msg.query,
+                role: 'user',
+                id: msg.id + '_user'
+            };
+            
+            // 如果有files字段，添加到用户消息中
+            if (msg.files && Array.isArray(msg.files) && msg.files.length > 0) {
+                userMessage.files = msg.files.map(file => ({
+                    id: file.id,
+                    filename: file.filename || file.name,
+                    type: file.type || 'document',
+                    size: file.size || 0,
+                    url: file.url || ''
+                }));
+            }
+            
+            // 如果有message_files字段，添加到用户消息中
+            if (msg.message_files && Array.isArray(msg.message_files) && msg.message_files.length > 0) {
+                if (!userMessage.files) {
+                    userMessage.files = [];
+                }
+                
+                msg.message_files.forEach(file => {
+                    userMessage.files.push({
+                        id: file.id,
+                        filename: file.filename || file.name,
+                        type: file.type || 'document',
+                        size: file.size || 0,
+                        url: file.url || ''
+                    });
+                });
+            }
+            
+            formattedMessages.push(userMessage);
+        }
+
+        // 如果有answer字段，创建助手消息
+        if (msg.answer) {
+            // 提取思考内容
+            const { content, reasoning } = extractThinkingContent(msg.answer);
+
+            // 创建基本助手消息
+            const assistantMessage = {
+                avatar: '/static/files/favicon.png', // 助手头像
+                name: '百年金钟，智启未来',
+                datetime: new Date(msg.created_at * 1000).toLocaleString(),
+                content: content || '',
+                role: 'assistant',
+                ...(reasoning ? { reasoning } : {}), // 只有有思考内容时才添加
+                id: msg.id + '_assistant'
+            };
+            
+            formattedMessages.push(assistantMessage);
+        }
+    }
+
+    // 后端API是倒序返回的(最新的在前面)，但前端显示需要正序，所以需要反转
+    formattedMessages.reverse();
+
+    return formattedMessages;
 };
 
 /**
@@ -393,8 +419,8 @@ export const createUserMessage = (content, files = []) => {
  */
 export const createAssistantMessage = (isDeepThinking = false) => {
     const baseMessage = {
-        avatar: 'https://tdesign.gtimg.com/site/chat-avatar.png',
-        name: 'TDesignAI',
+        avatar: '/static/files/favicon.png',
+        name: '百年金钟，智启未来',
         datetime: new Date().toLocaleString(),
         content: '',
         role: 'assistant',
@@ -536,7 +562,7 @@ export const autoRenameConversationIfNeeded = async (conversationId, options = {
                 }
                 
                 // 导入工作流API
-                const { generateArticleTitle } = await import('/static/app/api/workflow.js');
+                const { generateArticleTitle } = await import('/static/api/workflow.js');
                 
                 let titleGenerated = false;
                 let generatedTitle = '';

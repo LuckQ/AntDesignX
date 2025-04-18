@@ -1,0 +1,127 @@
+/**
+ * 全局动画样式定义
+ * 提供一系列可复用的动画效果
+ */
+
+/* 基础淡入淡出效果 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 欢迎页面渐变动画 - 缩放+上移效果 */
+.welcome-fade-enter-active,
+.welcome-fade-leave-active {
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.welcome-fade-enter-from,
+.welcome-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(20px);
+}
+
+.welcome-fade-enter-to,
+.welcome-fade-leave-from {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* 聊天消息的渐变动画 */
+.chat-items-enter-active,
+.chat-items-leave-active {
+  transition: all 0.5s ease;
+}
+
+.chat-items-enter-from {
+  opacity: 0;
+  transform: translateY(15px);
+}
+
+.chat-items-leave-to {
+  opacity: 0;
+  transform: translateY(-15px);
+}
+
+/* 为聊天消息添加进场延迟，实现瀑布流效果 */
+.chat-items-enter-active {
+  transition-delay: calc(0.08s * var(--item-index, 0));
+}
+
+/* 骨架屏加载动画 */
+.skeleton-fade-enter-active,
+.skeleton-fade-leave-active {
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.skeleton-fade-enter-from,
+.skeleton-fade-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.skeleton-fade-enter-to,
+.skeleton-fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 侧边栏滑动动画 */
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.slide-right-enter-from,
+.slide-right-leave-to {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.slide-right-enter-to,
+.slide-right-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* 建议问题的滑动动画 */
+.suggestions-slide-enter-active,
+.suggestions-slide-leave-active {
+    transition: all 0.3s ease;
+}
+
+.suggestions-slide-enter-from {
+    transform: translateY(20px);
+    opacity: 0;
+}
+
+.suggestions-slide-leave-to {
+    transform: translateY(20px);
+    opacity: 0;
+}
+
+/* 标签悬浮动画 */
+@mixin hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* 通用过渡效果 */
+@mixin smooth-transition {
+  transition: all 0.3s ease;
+} 

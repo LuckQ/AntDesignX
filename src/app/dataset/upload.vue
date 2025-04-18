@@ -1,78 +1,79 @@
 <template>
     <div class="dataset-upload-container">
-      <t-breadcrumb class="breadcrumb">
-        <t-breadcrumb-item @click="backToDetail">知识库文档</t-breadcrumb-item>
-        <t-breadcrumb-item>上传文档</t-breadcrumb-item>
-      </t-breadcrumb>
-      
-      <t-card title="上传文档">
-        <t-loading :loading="loading">
-          <t-form class="upload-form" label-width="120px">
-            <t-form-item label="文档文件" name="file">
-              <t-input v-if="selectedFileName" :value="selectedFileName" readonly placeholder="已选择文件" :style="{ marginBottom: '8px' }">
-                <template #suffix>
-                  <t-icon name="close-circle-filled" @click="clearSelectedFile" style="cursor: pointer;" />
-                </template>
-              </t-input>
-              <t-button v-if="!selectedFileName" @click="openFileSelector">
-                选择文件
-              </t-button>
-              <input type="file" ref="fileInput" style="display: none;" accept=".txt,.md,.mdx,.pdf,.html,.htm,.xlsx,.xls,.docx,.csv" @change="onFileSelected" />
-            </t-form-item>
-            
-            <t-form-item>
-              <div class="file-limits">
-                支持的文件类型：TXT、MD、MDX、PDF、HTML、XLSX、XLS、DOCX、CSV、HTM，单个文件不超过15MB
-              </div>
-            </t-form-item>
-            
-            <t-form-item v-if="isUploading">
-              <t-progress :percentage="uploadProgress" :color="{ from: '#0052D9', to: '#00A870' }" />
-              <div class="upload-status">
-                <span>状态: {{ uploadStatusText }}</span>
-                <span v-if="indexingStatus">已处理: {{ indexingStatus.completed_segments || 0 }}/{{ indexingStatus.total_segments || 0 }} 段</span>
-              </div>
-            </t-form-item>
-            
-            <t-form-item>
-              <t-space>
-                <t-button theme="primary" @click="uploadSelectedFile" :loading="loading" :disabled="!selectedFile || isUploading">上传</t-button>
-                <t-button theme="default" @click="backToDetail">取消</t-button>
-              </t-space>
-            </t-form-item>
-          </t-form>
-        </t-loading>
-      </t-card>
+      <t-loading :loading="loading">
+        <t-form class="upload-form" label-width="120px">
+          <t-form-item label="文档文件" name="file">
+            <t-input v-if="selectedFileName" :value="selectedFileName" readonly placeholder="已选择文件" :style="{ marginBottom: '8px' }">
+              <template #suffix>
+                <t-icon name="close-circle-filled" @click="clearSelectedFile" />
+              </template>
+            </t-input>
+            <t-button v-if="!selectedFileName" @click="openFileSelector">
+              选择文件
+            </t-button>
+            <input type="file" ref="fileInput" style="display: none;" accept=".txt,.md,.mdx,.pdf,.html,.htm,.xlsx,.xls,.docx,.csv" @change="onFileSelected" />
+          </t-form-item>
+          
+          <t-form-item>
+            <div class="file-limits">
+              支持的文件类型：TXT、MD、MDX、PDF、HTML、XLSX、XLS、DOCX、CSV、HTML，单个文件不超过15MB
+            </div>
+          </t-form-item>
+          
+          <t-form-item>
+            <t-space>
+              <t-button theme="primary" @click="uploadSelectedFile" :loading="loading" :disabled="!selectedFile">上传</t-button>
+              <t-button theme="default" @click="backToDetail">取消</t-button>
+            </t-space>
+          </t-form-item>
+        </t-form>
+      </t-loading>
 
-      <div class="form-actions">
+      <!-- 仅在非弹窗模式下显示底部按钮 -->
+      <div v-if="showBreadcrumb" class="form-actions">
         <t-button theme="default" @click="backToDetail">返回文档列表</t-button>
       </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, watch, onMounted, defineProps, defineEmits } from 'vue';
+import { useRoute } from 'vue-router';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { createDocumentByFile, getDocumentIndexingStatus } from '/static/app/api/dataset.js';
+import { createDocumentByFile } from '/static/api/dataset.js';
+
+// 定义props和emits
+const props = defineProps({
+  datasetId: {
+    type: [String, Number],
+    required: true
+  },
+  isDialog: { // 添加属性标识是否在弹窗中显示
+    type: Boolean,
+    default: true
+  }
+});
+const emit = defineEmits(['back']);
 
 const route = useRoute();
-const router = useRouter();
-const datasetId = ref(route.params.id);
+const datasetId = ref('');
 const loading = ref(false);
+const showBreadcrumb = ref(!props.isDialog); // 只在非弹窗模式下显示面包屑
+
+// 监听props中的datasetId变化
+watch(() => props.datasetId, (newValue) => {
+  if (newValue && (typeof newValue === 'string' || typeof newValue === 'number')) {
+    console.log('更新datasetId:', newValue);
+    datasetId.value = String(newValue);
+  } else {
+    console.warn('收到无效的datasetId:', newValue);
+  }
+}, { immediate: true });
 
 // 文件选择相关
 const fileInput = ref(null);
 const selectedFile = ref(null);
 const selectedFileName = ref('');
-
-// 上传状态相关
-const isUploading = ref(false);
-const uploadProgress = ref(0);
-const uploadStatusText = ref('准备中');
-const indexingStatus = ref(null);
-const batchId = ref('');
-const statusCheckInterval = ref(null);
 
 // 文件表单默认配置
 const fileForm = ref({
@@ -124,6 +125,21 @@ const fileForm = ref({
   }
 });
 
+// 组件初始化
+onMounted(() => {
+  // 设置显示模式
+  showBreadcrumb.value = !props.isDialog;
+  
+  // 如果组件挂载时没有datasetId，尝试从路由参数获取
+  if (!datasetId.value && route.params.id) {
+    datasetId.value = route.params.id;
+    console.log('从路由参数获取datasetId:', datasetId.value);
+  }
+  
+  // 打印日志确认ID状态
+  console.log('上传组件初始化，datasetId:', datasetId.value, 'props.datasetId:', props.datasetId);
+});
+
 // 打开文件选择器
 const openFileSelector = () => {
   fileInput.value.click();
@@ -147,56 +163,6 @@ const clearSelectedFile = () => {
   }
 };
 
-// 检查上传状态
-const checkUploadStatus = async () => {
-  if (!batchId.value) return;
-  
-  try {
-    const response = await getDocumentIndexingStatus(datasetId.value, batchId.value);
-    if (response && response.data && response.data.length > 0) {
-      indexingStatus.value = response.data[0];
-      
-      // 更新进度信息
-      const status = indexingStatus.value.indexing_status;
-      uploadStatusText.value = getStatusText(status);
-      
-      // 计算进度百分比
-      if (indexingStatus.value.total_segments > 0) {
-        uploadProgress.value = Math.floor((indexingStatus.value.completed_segments / indexingStatus.value.total_segments) * 100);
-      }
-      
-      // 如果已完成或出错，停止检查
-      if (status === 'completed' || status === 'error') {
-        clearInterval(statusCheckInterval.value);
-        isUploading.value = false;
-        
-        if (status === 'completed') {
-          MessagePlugin.success('文档处理完成');
-          setTimeout(() => {
-            router.push(`/app/dataset/detail/${datasetId.value}`);
-          }, 1500);
-        } else if (status === 'error') {
-          MessagePlugin.error(`处理失败: ${indexingStatus.value.error || '未知错误'}`);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('获取上传状态失败:', error);
-  }
-};
-
-// 获取状态文本
-const getStatusText = (status) => {
-  const statusMap = {
-    'waiting': '等待中',
-    'queuing': '排队中',
-    'indexing': '处理中',
-    'completed': '已完成',
-    'error': '错误'
-  };
-  return statusMap[status] || status;
-};
-
 // 上传选中的文件
 const uploadSelectedFile = async () => {
   if (!selectedFile.value) {
@@ -209,12 +175,16 @@ const uploadSelectedFile = async () => {
     MessagePlugin.error('文件大小不能超过15MB');
     return;
   }
+
+  // 检查datasetId是否存在
+  if (!datasetId.value) {
+    console.error('上传文件时知识库ID为空, props.datasetId:', props.datasetId);
+    MessagePlugin.error('知识库ID不能为空，无法上传文件');
+    return;
+  }
   
   try {
     loading.value = true;
-    isUploading.value = true;
-    uploadProgress.value = 0;
-    uploadStatusText.value = '上传中';
     
     const formData = new FormData();
     
@@ -225,19 +195,21 @@ const uploadSelectedFile = async () => {
     const dataObj = {...fileForm.value};
     
     console.log('准备上传文件:', selectedFile.value.name, '配置:', dataObj);
+    console.log('使用的知识库ID:', datasetId.value);
     formData.append('data', JSON.stringify(dataObj));
     
     // 上传文件
     const result = await createDocumentByFile(datasetId.value, formData);
     console.log('文件上传成功:', result);
     
-    // 提示成功并返回列表页
+    // 直接提示成功并返回
     MessagePlugin.success('文件已上传，正在处理中');
-    router.push(`/app/dataset/detail/${datasetId.value}`);
+    
+    // 直接关闭弹窗并返回到上一页，不再等待处理状态
+    emit('back');
   } catch (error) {
     console.error('文件上传失败:', error);
-    MessagePlugin.error('文件上传失败');
-    isUploading.value = false;
+    MessagePlugin.error('文件上传失败: ' + (error.message || '未知错误'));
   } finally {
     loading.value = false;
   }
@@ -245,34 +217,28 @@ const uploadSelectedFile = async () => {
 
 // 返回详情页
 const backToDetail = () => {
-  // 如果正在上传，确认是否取消
-  if (isUploading.value) {
-    if (confirm('文件正在处理中，确定要离开吗？')) {
-      clearInterval(statusCheckInterval.value);
-      router.push(`/app/dataset/detail/${datasetId.value}`);
-    }
-  } else {
-    router.push(`/app/dataset/detail/${datasetId.value}`);
-  }
+  emit('back'); // 使用emit事件代替路由跳转
 };
-
-// 组件卸载时清理
-onUnmounted(() => {
-  if (statusCheckInterval.value) {
-    clearInterval(statusCheckInterval.value);
-  }
-});
 </script>
 
 <style lang="scss">
-@import '/static/app/styles/variables.scss';
+@import '/static/styles/variables.scss';
 
 .dataset-upload-container {
   padding: $comp-paddingTB-l $comp-paddingLR-l;
 }
 
-.breadcrumb {
+/* 新增：返回按钮和标题的布局 */
+.header-wrapper {
+  display: flex;
+  align-items: center;
   margin-bottom: $comp-margin-m;
+  
+  .upload-title {
+    margin: 0 0 0 8px;
+    font-size: 18px;
+    font-weight: 500;
+  }
 }
 
 .upload-form {
@@ -290,13 +256,5 @@ onUnmounted(() => {
   margin-top: 20px;
   display: flex;
   justify-content: center;
-}
-
-.upload-status {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  color: rgba(0, 0, 0, 0.6);
-  font-size: 14px;
 }
 </style> 

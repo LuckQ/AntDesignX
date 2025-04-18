@@ -90,7 +90,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import ConversationGroup from './ConversationGroup.vue';
-import { getThemeMode, toggleThemeMode, ThemeMode } from '/static/app/api/theme.js';
+import { getThemeMode, toggleThemeMode, ThemeMode } from '/static/api/theme.js';
 
 // 获取路由器实例
 const router = useRouter();
@@ -150,7 +150,7 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
 </script>
 
 <style lang="scss" scoped>
-@import '/static/app/styles/variables.scss';
+@import '/static/styles/variables.scss';
 
 .drawer-container {
     display: flex;

@@ -1,6 +1,6 @@
 <template>
     <t-chat-item :avatar="avatar" :name="name" :role="role" :datetime="datetime" :content="content">
-        <template #content>
+        <template #content cla>
 
             <t-collapse :expand-icon="null" :borderless="true" :default-expand-all="isWorkflowCompleted"
                 class="transparent-collapse" v-if="role === 'assistant' && workflowSteps && workflowSteps.length > 0">
@@ -34,14 +34,16 @@
             <!-- 显示消息内容，如果没有则显示占位 -->
             <t-chat-content v-if="content && content.trim().length > 0" :content="content" class="zero-margins" />
 
-
+            <!-- 文件展示 -->
             <div class="message-files" v-if="files && files.length > 0">
                 <div class="files-scroll-container">
-                    <t-tag v-for="(file, index) in files" :key="index" theme="default" variant="light" shape="round"
-                        size="medium" class="file-tag">
-                        <t-icon :name="getFileIcon(file.type)" class="file-icon" />
-                        <span class="file-name">{{ formatFileName(file.filename) }}</span>
-                    </t-tag>
+                    <div class="files-list">
+                        <t-tag v-for="(file, index) in files" :key="index" theme="default" variant="light" shape="round"
+                            size="small" :class="['file-tag', getFileTypeClass(getFileExtension(file.filename))]">
+                            <t-icon :name="getFileIcon(getFileExtension(file.filename))" class="file-icon" />
+                            <span class="file-name">{{ formatFileName(file.filename) }}</span>
+                        </t-tag>
+                    </div>
                 </div>
             </div>
 
@@ -59,9 +61,8 @@
 
         <!-- 操作按钮，只对助手消息显示 -->
         <template #actions>
-
-            <chat-action v-if="!isStreamLoad && role === 'assistant'" :is-good="isGood" :is-bad="isBad"
-                :content="content || ''" @operation="handleOperation" />
+            <chat-action class="chat-actions-container" v-if="!isStreamLoad && role === 'assistant'" :is-good="isGood" :is-bad="isBad"
+                :content="content || ''" @operation="handleOperation" />    
         </template>
     </t-chat-item>
 </template>
@@ -164,18 +165,110 @@ const isWorkflowCompleted = computed(() => {
     return props.workflowSteps && props.workflowSteps.length > 0 && !props.workflowSteps.some(step => step.loading);
 });
 
+// 获取文件扩展名
+const getFileExtension = (filename) => {
+    if (!filename) return '';
+    const lastDotIndex = filename.lastIndexOf('.');
+    if (lastDotIndex === -1) return '';
+    return filename.slice(lastDotIndex + 1).toLowerCase();
+};
+
+// 文件类型映射
+const fileTypeMap = {
+    'document': 'document',
+    'image': 'image',
+    'audio': 'audio',
+    'video': 'video',
+    'txt': 'text',
+    'md': 'markdown',
+    'mdx': 'markdown',
+    'markdown': 'markdown',
+    'pdf': 'pdf',
+    'html': 'code',
+    'htm': 'code',
+    'js': 'code',
+    'ts': 'code',
+    'css': 'code',
+    'scss': 'code',
+    'less': 'code',
+    'json': 'code',
+    'py': 'code',
+    'java': 'code',
+    'c': 'code',
+    'cpp': 'code',
+    'h': 'code',
+    'php': 'code',
+    'rb': 'code',
+    'go': 'code',
+    'rs': 'code',
+    'swift': 'code',
+    'kt': 'code',
+    'dart': 'code',
+    'vue': 'code',
+    'jsx': 'code',
+    'tsx': 'code',
+    'xml': 'code',
+    'yaml': 'code',
+    'yml': 'code',
+    'xlsx': 'spreadsheet',
+    'xls': 'spreadsheet',
+    'csv': 'spreadsheet',
+    'docx': 'document',
+    'doc': 'document',
+    'rtf': 'document',
+    'odt': 'document',
+    'jpg': 'image',
+    'jpeg': 'image',
+    'png': 'image',
+    'gif': 'image',
+    'svg': 'image',
+    'bmp': 'image',
+    'webp': 'image',
+    'mp3': 'audio',
+    'wav': 'audio',
+    'ogg': 'audio',
+    'flac': 'audio',
+    'aac': 'audio',
+    'm4a': 'audio',
+    'mp4': 'video',
+    'avi': 'video',
+    'mov': 'video',
+    'wmv': 'video',
+    'mkv': 'video',
+    'webm': 'video',
+    'custom': 'generic',
+    'default': 'generic' // 默认/通用类型
+};
+
 // 文件图标映射
 const fileIconMap = {
-    'document': 'file-excel',
+    'text': 'file-text',
+    'markdown': 'catalog',
+    'pdf': 'file-pdf',
+    'code': 'file-code',
+    'spreadsheet': 'file-excel',
+    'document': 'file-word',
     'image': 'photo',
     'audio': 'play-circle',
     'video': 'play-circle-stroke',
-    'custom': 'file'
+    'generic': 'file' // 默认图标
+};
+
+// 获取文件类型
+const getFileType = (extension) => {
+    return fileTypeMap[extension?.toLowerCase()] || fileTypeMap.default;
 };
 
 // 获取文件图标
-const getFileIcon = (type) => {
-    return fileIconMap[type] || 'file';
+const getFileIcon = (extension) => {
+    const fileType = getFileType(extension);
+    return fileIconMap[fileType] || fileIconMap.generic;
+};
+
+// 获取文件类型对应的CSS类名
+const getFileTypeClass = (extension) => {
+    const fileType = getFileType(extension);
+    return `file-type-${fileType}`;
 };
 
 // 添加：节点类型到图标的映射
@@ -234,15 +327,15 @@ const getLoadingDots = () => {
 // 格式化文件名
 const formatFileName = (fileName) => {
     if (!fileName) return '';
-    if (fileName.length <= 10) return fileName;
-
+    if (fileName.length <= 8) return fileName;
+    
     const lastDotIndex = fileName.lastIndexOf('.');
-    if (lastDotIndex === -1) return fileName.slice(0, 7) + '...';
-
+    if (lastDotIndex === -1) return fileName.slice(0, 5) + '...';
+    
     const extension = fileName.slice(lastDotIndex);
     const name = fileName.slice(0, lastDotIndex);
-    if (name.length <= 7) return fileName; // 如果名称部分已经很短，保留全名
-    return name.slice(0, 7) + '...' + extension;
+    if (name.length <= 5) return fileName; // 如果名称部分已经很短，保留全名
+    return name.slice(0, 5) + '...' + extension;
 };
 
 // 添加：获取折叠面板标题函数
@@ -271,176 +364,287 @@ const getCollapseHeader = (steps) => {
 };
 </script>
 
-<style lang="scss" scoped>
-@import '/static/app/styles/variables.scss';
+<style lang="scss">
+@import '/static/styles/variables.scss';
 
-.loading-space {
-    margin-top: $size-3;
-    margin-left: $size-4;
+/* 添加基础过渡效果 */
+.t-chat-item {
+    transition: all 0.3s ease, width 0.3s ease, max-width 0.3s ease, transform 0.3s ease;
+}
+
+/* 消息内容容器 */
+:deep(.t-chat__bubble) {
+    transition: all 0.3s ease, width 0.3s ease, max-width 0.3s ease;
+}
+
+/* 透明折叠面板 */
+.transparent-collapse {
+    background-color: transparent;
     transition: all 0.3s ease;
+
+    :deep(.t-collapse-panel__header) {
+        background-color: transparent;
+        transition: all 0.3s ease;
+    }
+
+    :deep(.t-collapse-panel__content) {
+        background-color: transparent;
+        transition: all 0.3s ease;
+    }
 }
 
-:deep(.t-chat__detail-reasoning) {
-    padding-top: 0px !important;
+/* 工作流时间线 */
+.workflow-timeline {
+    width: 100%;
+    margin-top: 8px;
+    transition: all 0.3s ease;
+
+    .t-timeline-item {
+        transition: all 0.3s ease;
+    }
 }
 
+/* 思考框样式 */
+:deep(.t-chat-reasoning) {
+    transition: all 0.3s ease, max-width 0.3s ease, width 0.3s ease;
+    
+    .t-chat-reasoning__header, 
+    .t-chat-reasoning__content {
+        transition: all 0.3s ease;
+    }
+}
+
+/* 思考框头部样式 */
 .reasoning-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: $text-color-primary;
-    transition: color 0.3s ease;
+    gap: 6px;
+    transition: all 0.3s ease;
 
     .t-icon {
-        margin-right: $size-2;
-        transition: all 0.3s ease;
+        font-size: 16px;
+        color: var(--td-brand-color);
     }
 }
 
-/* 工作流时间轴样式 */
-.workflow-timeline {
-    margin-top: $size-3;
-
-    :deep(.t-timeline__item) {
-        padding-bottom: $size-4;
-    }
-
-    :deep(.t-timeline__item-dot) {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    :deep(.t-timeline-item__label) {
-        transition: all 0.3s ease;
-    }
-
-    .dot-loading-wrapper {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-    }
-
-    .dot-loading-wrapper {
-        :deep(.t-loading__spin) {
-            font-size: 16px;
-        }
-    }
-
-    .step-loading {
-        display: inline-flex;
-        align-items: center;
-        color: var(--td-text-color-secondary);
-
-        .loading-dots {
-            display: inline-block;
-            min-width: 30px;
-            overflow: hidden;
-            text-overflow: clip;
-            white-space: nowrap;
-        }
-    }
+/* 消息内容无边距 */
+.zero-margins {
+    margin: 0 !important;
+    transition: all 0.3s ease;
 }
 
-/* 消息文件展示样式 */
+/* 文件展示区域 */
 .message-files {
-    width: 100%;
+    margin-top: 12px;
+    transition: all 0.3s ease;
 }
 
+/* 文件滚动容器 */
 .files-scroll-container {
     display: flex;
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
-    /* Firefox */
-    -webkit-overflow-scrolling: touch;
-    padding: 4px 0;
-    white-space: nowrap;
     -ms-overflow-style: none;
-    /* IE and Edge */
+    transition: all 0.3s ease;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    .files-list {
+        display: flex;
+        align-items: center;
+        padding-left: 4px;
+        overflow: visible;
+    }
 }
 
-/* 隐藏滚动条但保留功能 */
-.files-scroll-container::-webkit-scrollbar {
-    display: none;
-    /* Chrome, Safari, Opera */
-}
-
-.files-scroll-container::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-}
-
+/* 文件标签 */
 .file-tag {
-    display: inline-flex;
-    align-items: center;
-    margin: 0 4px;
-    padding: 2px 6px 2px 10px;
-    background-color: var(--td-bg-color-container, $gray-color-1);
-    border-color: var(--td-component-border, $gray-color-3);
+    position: relative;
+    margin-left: -70px;
+    padding: 5px 6px 5px 8px;
+    max-width: 130px;
+    min-width: 100px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    border-radius: 12px;
+    transition: transform 0.2s ease, margin-left 0.2s ease, z-index 0s linear 0s, border-color 0.2s ease, background-color 0.2s ease;
+    cursor: pointer;
+    box-sizing: border-box;
 
+    &:first-child {
+        margin-left: 0;
+    }
+
+    &:hover {
+        z-index: 10;
+        transform: scale(1.05);
+        border-color: var(--td-brand-color, $brand-color);
+    }
+
+    /* 文件图标 */
     .file-icon {
-        color: $success-color-7;
-        font-size: 16px;
-        margin-right: 6px;
+        font-size: 14px;
+        margin-right: 4px;
+        color: var(--td-text-color-secondary, $gray-color-7);
         flex-shrink: 0;
     }
 
+    /* 文件名称 */
     .file-name {
-        color: var(--td-text-color-primary, $font-gray-1);
-        max-width: 120px;
+        font-size: 12px;
+        color: var(--td-text-color-primary, #000);
+        flex-grow: 1;
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        margin-right: 4px;
     }
-}
 
-/* 确保Markdown内容中的元素没有边距 */
-:deep(.zero-margins) {
+    /* 通用文件 - 灰色 */
+    &.file-type-generic {
+        background-color: var(--td-gray-color-1, #f3f3f3);
+        border: 1px solid var(--td-gray-color-3, #dcdcdc);
 
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6 {
-        margin-top: 0 !important;
-        margin-bottom: 8px !important;
-        padding: 0 !important;
-        line-height: normal !important;
+        .file-icon {
+            color: var(--td-text-color-secondary, $gray-color-7);
+        }
     }
-}
 
-:deep(.t-chat__text--user) {
-    text-align: right !important;
-}
+    /* 文本文档 (txt) - 保持蓝色 */
+    &.file-type-text {
+        background-color: var(--td-brand-color-light, rgba($brand-color, 0.1));
+        border: 1px solid var(--td-brand-color-2, rgba($brand-color, 0.3));
 
-/* 透明折叠面板样式 */
-.transparent-collapse {
-    .workflow-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        .file-icon {
+            color: var(--td-brand-color, $brand-color);
+        }
+    }
 
-        .t-icon {
-            font-size: 16px;
+    /* Markdown 文档 - 改为灰色 */
+    &.file-type-markdown {
+        background-color: var(--td-gray-color-1, #f3f3f3);
+        border: 1px solid var(--td-gray-color-3, #dcdcdc);
+
+        .file-icon {
+            color: var(--td-text-color-secondary, $gray-color-7);
+        }
+    }
+
+    /* PDF 文档 - 红色 */
+    &.file-type-pdf {
+        background-color: var(--td-error-color-1, rgba($error-color, 0.1));
+        border: 1px solid var(--td-error-color-2, rgba($error-color, 0.3));
+
+        .file-icon {
+            color: var(--td-error-color, $error-color);
+        }
+    }
+
+    /* 代码文件 - 橙色 */
+    &.file-type-code {
+        background-color: var(--td-warning-color-1, rgba($warning-color, 0.1));
+        border: 1px solid var(--td-warning-color-2, rgba($warning-color, 0.3));
+
+        .file-icon {
+            color: var(--td-warning-color, $warning-color);
+        }
+    }
+
+    /* 电子表格 - 绿色 */
+    &.file-type-spreadsheet {
+        background-color: var(--td-success-color-1, rgba($success-color, 0.1));
+        border: 1px solid var(--td-success-color-2, rgba($success-color, 0.3));
+
+        .file-icon {
+            color: var(--td-success-color, $success-color);
+        }
+    }
+
+    /* Word文档 - 蓝色 */
+    &.file-type-document {
+        background-color: var(--td-brand-color-light, rgba($brand-color, 0.1));
+        border: 1px solid var(--td-brand-color-2, rgba($brand-color, 0.3));
+
+        .file-icon {
+            color: var(--td-brand-color, $brand-color);
+        }
+    }
+
+    /* 图片 - 紫色 */
+    &.file-type-image {
+        background-color: var(--td-purple-color-1, rgba(#722ed1, 0.1));
+        border: 1px solid var(--td-purple-color-3, rgba(#722ed1, 0.3));
+
+        .file-icon {
+            color: var(--td-purple-color, #722ed1);
+        }
+    }
+
+    /* 音频 - 青色 */
+    &.file-type-audio {
+        background-color: var(--td-cyan-color-1, rgba(#13c2c2, 0.1));
+        border: 1px solid var(--td-cyan-color-3, rgba(#13c2c2, 0.3));
+
+        .file-icon {
+            color: var(--td-cyan-color, #13c2c2);
+        }
+    }
+
+    /* 视频 - 品红 */
+    &.file-type-video {
+        background-color: var(--td-magenta-color-1, rgba(#eb2f96, 0.1));
+        border: 1px solid var(--td-magenta-color-3, rgba(#eb2f96, 0.3));
+
+        .file-icon {
+            color: var(--td-magenta-color, #eb2f96);
         }
     }
 }
 
-.t-collapse {
-    background-color: transparent !important;
+.t-tag.t-size-s{
+    padding: 11px 6px 12px 8px;
 }
 
-:deep(.t-collapse.t--border-less .t-collapse-panel__body) {
-    background-color: transparent !important;
+/* 步骤加载中 */
+.step-loading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.3s ease;
 }
 
-:deep(.t-collapse-panel__wrapper .t-collapse-panel__content) {
-    padding: 0px 10px !important;
-    margin-top: 10px !important;
+/* 加载点动画 */
+.loading-dots {
+    width: 24px;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+/* 加载空间 */
+.loading-space {
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+/* 头像相关样式 */
+:deep(.t-tag .t-icon) {
+    width: 14px;
+    height: 14px;
+}
+
+/* 工作流标题 */
+.workflow-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    
+    .t-icon {
+        font-size: 16px;
+    }
 }
 </style>
