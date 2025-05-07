@@ -20,13 +20,13 @@ export function useMessageHandlers() {
         }
 
         try {
-            // 如果是首次收到思考内容，则替换"思考中..."
-            if (!lastItem.reasoning || lastItem.reasoning === '思考中...') {
-                lastItem.reasoning = reasoningText || '';
-            } else {
-                // 否则，追加思考内容
-                lastItem.reasoning += reasoningText || '';
-            }
+            // // 如果是首次收到思考内容，则替换"思考中..."
+            // if (!lastItem.reasoning || lastItem.reasoning === '思考中...') {
+            //     lastItem.reasoning = reasoningText || '';
+            // } else {
+            //     // 否则，追加思考内容
+            //     lastItem.reasoning += reasoningText || '';
+            // }
         } catch (e) {
             console.error('处理思考内容出错:', e);
         }

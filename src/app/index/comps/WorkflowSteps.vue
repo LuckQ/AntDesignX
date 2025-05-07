@@ -9,13 +9,19 @@
 
     <!-- 工作流程详情 -->
     <div class="workflow-details" v-if="showWorkflow">
-      <div v-for="(step, index) in steps" :key="`step-${index}`" class="workflow-step">
+      <div v-for="(step, index) in filteredSteps" :key="`step-${index}`" class="workflow-step">
         <!-- 工具调用决策 -->
         <div v-if="step.node_type === 'action_decision'" class="decision-step">
           <div class="step-badge tool-badge">
             <t-icon :name="getToolIcon(step.action?.tool)" />
           </div>
           <div class="step-content">
+            <!-- 思考过程显示在上方 -->
+            <div v-if="step.thought" class="thought-text">
+              <div class="thought-label">思考过程:</div>
+              <div class="thought-content">{{ step.thought }}</div>
+            </div>
+            <!-- 工具调用显示在下方 -->
             <div class="tool-call">
               <div class="tool-header">
                 <span class="tool-name">调用工具: {{ step.action?.tool || '未知工具' }}</span>
@@ -23,10 +29,6 @@
               <div v-if="step.action?.tool_input" class="tool-params">
                 <pre>{{ formatJson(step.action.tool_input) }}</pre>
               </div>
-            </div>
-            <div v-if="step.thought" class="thought-text">
-              <div class="thought-label">思考过程:</div>
-              <div class="thought-content">{{ step.thought }}</div>
             </div>
           </div>
         </div>
@@ -51,20 +53,6 @@
           </div>
         </div>
 
-        <!-- 最终回答 -->
-        <div v-else-if="step.node_type === 'final_answer'" class="final-step">
-          <div class="step-badge final-badge">
-            <t-icon name="chat" />
-          </div>
-          <div class="step-content">
-            <div v-if="step.thought" class="thought-text">
-              <div class="thought-label">思考过程:</div>
-              <div class="thought-content">{{ step.thought }}</div>
-            </div>
-            <div v-else class="final-answer-note">生成最终回答</div>
-          </div>
-        </div>
-
         <!-- 其他步骤类型 -->
         <div v-else class="generic-step">
           <div class="step-badge">
@@ -81,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 // 定义组件的属性
 const props = defineProps({
@@ -89,6 +77,11 @@ const props = defineProps({
     type: Array,
     default: () => []
   }
+});
+
+// 过滤掉最终回答步骤
+const filteredSteps = computed(() => {
+  return props.steps.filter(step => step.node_type !== 'final_answer');
 });
 
 // 工作流显示状态
@@ -127,8 +120,7 @@ const nodeIconMap = {
   'error': 'error-circle',
   'tool': 'tools',
   'action_decision': 'tools',
-  'tool_result': 'check',
-  'final_answer': 'chat',
+  'tool_result': 'check'
 };
 
 // 获取工具图标
@@ -148,8 +140,6 @@ const getStepTitle = (step) => {
     return `调用${step.action?.tool || '未知工具'}工具`;
   } else if (step.node_type === 'tool_result') {
     return `处理${step.tool || '工具'}结果`;
-  } else if (step.node_type === 'final_answer') {
-    return '生成回答';
   } else {
     return step.title || '未知步骤';
   }
@@ -194,10 +184,12 @@ const formatJson = (data) => {
   border: 1px solid var(--td-component-stroke, rgba(0, 0, 0, 0.08));
   background-color: var(--td-bg-color-container);
   transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   
   // 深色模式适配
   [theme-mode="dark"] & {
     border-color: var(--td-component-stroke, rgba(255, 255, 255, 0.08));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   }
 }
 
@@ -209,6 +201,7 @@ const formatJson = (data) => {
   background-color: var(--td-bg-color-container-select);
   cursor: pointer;
   transition: all 0.3s ease;
+  border-bottom: 1px solid var(--td-component-stroke, rgba(0, 0, 0, 0.08));
   
   &:hover {
     background-color: var(--td-bg-color-container-hover);
@@ -236,7 +229,7 @@ const formatJson = (data) => {
 
 /* 工作流详情区域 */
 .workflow-details {
-  padding: 8px 16px 16px;
+  padding: 12px 16px 16px;
   transition: all 0.3s ease;
 }
 
@@ -244,7 +237,7 @@ const formatJson = (data) => {
 .workflow-step {
   position: relative;
   display: flex;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   transition: all 0.3s ease;
   
   &:last-child {
@@ -257,7 +250,7 @@ const formatJson = (data) => {
     top: 28px;
     left: 12px;
     width: 2px;
-    height: calc(100% + 8px);
+    height: calc(100% + 12px);
     background-color: var(--td-component-stroke);
     z-index: 1;
   }
@@ -291,11 +284,6 @@ const formatJson = (data) => {
     background-color: var(--td-success-color-light);
     color: var(--td-success-color);
   }
-  
-  &.final-badge {
-    background-color: var(--td-warning-color-light);
-    color: var(--td-warning-color);
-  }
 }
 
 /* 步骤内容容器 */
@@ -308,10 +296,11 @@ const formatJson = (data) => {
 /* 决策步骤样式 */
 .decision-step {
   .thought-text {
-    margin-top: 12px;
-    border-radius: 6px;
+    margin-bottom: 12px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--td-component-stroke);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     
     .thought-label {
       padding: 8px 12px;
@@ -323,10 +312,10 @@ const formatJson = (data) => {
     }
     
     .thought-content {
-      padding: 10px 12px;
+      padding: 12px;
       color: var(--td-text-color-secondary);
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1.6;
       white-space: pre-wrap;
       background-color: var(--td-bg-color-container);
     }
@@ -334,8 +323,9 @@ const formatJson = (data) => {
   
   .tool-call {
     border: 1px solid var(--td-component-stroke);
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     
     .tool-header {
       display: flex;
@@ -370,11 +360,11 @@ const formatJson = (data) => {
 /* 结果步骤样式 */
 .result-step {
   .result-header {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     
     .result-status {
       display: inline-block;
-      padding: 4px 8px;
+      padding: 4px 10px;
       border-radius: 4px;
       font-size: 13px;
       font-weight: 500;
@@ -394,11 +384,12 @@ const formatJson = (data) => {
   .result-data {
     padding: 12px;
     background-color: var(--td-bg-color-container-hover);
-    border-radius: 6px;
+    border-radius: 8px;
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
     line-height: 1.5;
     overflow-x: auto;
+    border: 1px solid var(--td-component-stroke);
     
     pre {
       margin: 0;
@@ -410,42 +401,8 @@ const formatJson = (data) => {
   .result-error {
     padding: 12px;
     background-color: var(--td-error-color-light);
-    border-radius: 6px;
+    border-radius: 8px;
     color: var(--td-error-color);
-    font-size: 13px;
-  }
-}
-
-/* 最终回答步骤样式 */
-.final-step {
-  .thought-text {
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--td-component-stroke);
-    
-    .thought-label {
-      padding: 8px 12px;
-      background-color: rgba(var(--td-warning-color-rgb), 0.1);
-      color: var(--td-warning-color);
-      font-weight: 500;
-      font-size: 14px;
-      border-bottom: 1px solid var(--td-component-stroke);
-    }
-    
-    .thought-content {
-      padding: 10px 12px;
-      color: var(--td-text-color-secondary);
-      font-size: 13px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      background-color: var(--td-bg-color-container);
-    }
-  }
-  
-  .final-answer-note {
-    padding: 8px 12px;
-    color: var(--td-text-color-secondary);
-    font-style: italic;
     font-size: 13px;
   }
 }
@@ -459,11 +416,12 @@ const formatJson = (data) => {
   }
   
   .step-data {
-    padding: 10px;
+    padding: 12px;
     background-color: var(--td-bg-color-container-hover);
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 13px;
     line-height: 1.5;
+    border: 1px solid var(--td-component-stroke);
   }
 }
 
