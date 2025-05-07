@@ -12,7 +12,7 @@ import { API_CONFIG } from './config.js';
 export const createRequestController = () => {
     const controller = new AbortController();
     const signal = controller.signal;
-    
+
     // 创建中断函数
     const abortRequest = () => {
         // 只有在未中断的情况下才执行中断操作
@@ -28,7 +28,7 @@ export const createRequestController = () => {
             console.log('请求已经被中断，不再重复执行');
         }
     };
-    
+
     return {
         controller,
         signal,
@@ -57,16 +57,16 @@ export const createTimeoutProtection = (abortFunction, timeout = 30000) => {
  */
 export const handleRequestAbort = (lastMessage, stateControls) => {
     const { loading, isStreamLoad } = stateControls;
-    
+
     // 重置加载状态
     if (loading && typeof loading.value !== 'undefined') {
         loading.value = false;
     }
-    
+
     if (isStreamLoad && typeof isStreamLoad.value !== 'undefined') {
         isStreamLoad.value = false;
     }
-    
+
     // 处理消息状态
     if (lastMessage && lastMessage.role === 'assistant') {
         // 如果消息为空，添加一个提示
@@ -94,29 +94,29 @@ export const handleRequestAbort = (lastMessage, stateControls) => {
  */
 export const handleRequestError = (error, lastMessage, stateControls) => {
     const { loading, isStreamLoad } = stateControls;
-    const errorMessage = error?.message || error || '请求失败';
-    
+    const errorMessage = error.message || error || '请求失败';
+
     console.log('处理请求错误:', errorMessage);
-    
+
     // 重置加载状态
     if (loading && typeof loading.value !== 'undefined') {
         loading.value = false;
     }
-    
+
     if (isStreamLoad && typeof isStreamLoad.value !== 'undefined') {
         isStreamLoad.value = false;
     }
-    
+
     // 检查是否是中断导致的错误或消息通道关闭错误
-    const isAborted = 
-        errorMessage.includes('abort') || 
-        errorMessage.includes('中断') || 
+    const isAborted =
+        errorMessage.includes('abort') ||
+        errorMessage.includes('中断') ||
         errorMessage.includes('cancel') ||
         errorMessage.includes('BodyStreamBuffer was aborted') ||
         errorMessage.includes('message channel closed') ||
         errorMessage.includes('listener indicated an asynchronous response') ||
-        error?.name === 'AbortError';
-    
+        error.name === 'AbortError';
+
     if (isAborted) {
         // 处理中断状态
         if (lastMessage) {
@@ -125,7 +125,7 @@ export const handleRequestError = (error, lastMessage, stateControls) => {
             } else if (!lastMessage.content.includes('[已中断]')) {
                 lastMessage.content += ' [已中断]';
             }
-            
+
             // 处理思考状态
             if (lastMessage.reasoning === '思考中...') {
                 lastMessage.reasoning = '思考过程已中断';
@@ -138,7 +138,7 @@ export const handleRequestError = (error, lastMessage, stateControls) => {
         lastMessage.role = 'error';
         lastMessage.content = errorMessage;
     }
-    
+
     return isAborted;
 };
 
@@ -153,22 +153,22 @@ export const handleRequestError = (error, lastMessage, stateControls) => {
 export const handleRequestComplete = (isOk, msg, lastMessage, stateControls, controllers) => {
     const { loading, isStreamLoad } = stateControls || {};
     const { timeoutId, fetchCancel } = controllers || {};
-    
+
     // 清除超时保护
     if (timeoutId) {
         clearTimeout(timeoutId);
     }
-    
+
     // 检查是否是中断导致的完成
     const isAborted = !isOk && (msg && (
-        msg.includes('abort') || 
-        msg.includes('中断') || 
+        msg.includes('abort') ||
+        msg.includes('中断') ||
         msg.includes('cancel') ||
         msg.includes('BodyStreamBuffer was aborted') ||
         msg.includes('message channel closed') ||
         msg.includes('listener indicated an asynchronous response')
     ));
-    
+
     // 确保lastMessage存在再进行操作
     if (lastMessage) {
         if (isAborted) {
@@ -182,18 +182,18 @@ export const handleRequestComplete = (isOk, msg, lastMessage, stateControls, con
             lastMessage.content = msg || '请求失败';
         }
     }
-    
+
     // 重置状态
-    if (isStreamLoad && typeof isStreamLoad?.value !== 'undefined') {
+    if (isStreamLoad && typeof isStreamLoad.value !== 'undefined') {
         isStreamLoad.value = false;
     }
-    
-    if (loading && typeof loading?.value !== 'undefined') {
+
+    if (loading && typeof loading.value !== 'undefined') {
         loading.value = false;
     }
-    
+
     // 清空中断函数，防止内存泄漏
-    if (fetchCancel && typeof fetchCancel?.value !== 'undefined') {
+    if (fetchCancel && typeof fetchCancel.value !== 'undefined') {
         // 确保中断函数存在且未执行过时再尝试设置为null
         try {
             fetchCancel.value = null;
@@ -209,7 +209,7 @@ export const handleRequestComplete = (isOk, msg, lastMessage, stateControls, con
  * @param {String} userId - 用户ID
  * @returns {Promise<boolean>} 是否成功停止
  */
-export const stopStreamResponse = async (taskId, userId) => {
+export const stopStreamResponse = async(taskId, userId) => {
     if (!taskId || !userId) {
         console.error('[Stream Stop] 停止响应失败: taskId或userId不能为空', { taskId, userId });
         return false;
@@ -221,9 +221,9 @@ export const stopStreamResponse = async (taskId, userId) => {
         // 使用统一的API配置
         const baseURL = API_CONFIG.baseURL;
         const apiKey = API_CONFIG.apiKey;
-        
+
         console.log('[Stream Stop] 发送停止请求到:', `${baseURL}/chat-messages/${taskId}/stop`);
-        
+
         const response = await fetch(`${baseURL}/chat-messages/${taskId}/stop`, {
             method: 'POST',
             headers: {
@@ -234,19 +234,19 @@ export const stopStreamResponse = async (taskId, userId) => {
                 user: userId
             })
         });
-        
+
         const result = await response.json();
-        
+
         if (response.ok) {
-            console.log('[Stream Stop] 流式响应已成功停止', { 
+            console.log('[Stream Stop] 流式响应已成功停止', {
                 status: response.status,
-                result: result 
+                result: result
             });
             return true;
         } else {
-            console.error('[Stream Stop] 停止响应请求失败:', { 
-                status: response.status, 
-                result: result 
+            console.error('[Stream Stop] 停止响应请求失败:', {
+                status: response.status,
+                result: result
             });
             return false;
         }

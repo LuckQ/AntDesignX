@@ -426,7 +426,8 @@ export const createUserMessage = (content, files = []) => {
     // 如果有文件，添加到消息对象
     if (files && Array.isArray(files) && files.length > 0) {
         userMessage.files = files.map(file => ({
-            id: file.upload_file_id || file.id,
+            // 优先使用标准的file_id字段，其次是upload_file_id，最后是id
+            id: file.file_id || file.upload_file_id || file.id,
             filename: file.filename || file.name || '未命名文件',
             type: file.type || 'document',
             size: file.size || 0,

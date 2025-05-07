@@ -29,11 +29,12 @@
             </div>
 
             <!-- 文件展示 -->
-            <div class="message-files" v-if="files && files.length > 0">
+            <div class="message-files" v-if="processedFiles.length > 0">
                 <div class="files-scroll-container">
                     <div class="files-list">
-                        <t-tag v-for="(file, index) in files" :key="index" theme="default" variant="light" shape="round"
-                            size="small" :class="['file-tag', getFileTypeClass(getFileExtension(file.filename))]">
+                        <t-tag v-for="(file, index) in processedFiles" :key="index" theme="default" variant="light" shape="round"
+                            size="small" :class="['file-tag', getFileTypeClass(getFileExtension(file.filename))]"
+                            @click="handleFileClick(file)">
                             <t-icon :name="getFileIcon(getFileExtension(file.filename))" class="file-icon" />
                             <span class="file-name">{{ formatFileName(file.filename) }}</span>
                         </t-tag>
@@ -59,12 +60,25 @@
                 :content="content || ''" @operation="handleOperation" />
         </template>
     </t-chat-item>
+
+    <!-- 文件下载确认对话框 -->
+    <t-dialog
+      v-model:visible="showDownloadDialog"
+      header="下载文件"
+      :body="downloadDialogContent"
+      :confirm-btn="{ content: '下载', theme: 'primary' }"
+      :cancel-btn="{ content: '取消', theme: 'default' }"
+      @confirm="downloadFile"
+    />
 </template>
 
 <script setup lang="jsx">
-import { defineProps, defineEmits, ref, onMounted, onUnmounted, computed } from 'vue';
+import { defineProps, defineEmits, ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChatAction from './ChatAction.vue';
 import WorkflowSteps from './WorkflowSteps.vue';
+import { API_CONFIG, createApiUrl } from '/static/api/config.js';
+import { ensureUserId } from '/static/api/chat.js';
 
 // 组件属性
 const props = defineProps({
@@ -129,6 +143,13 @@ const props = defineProps({
 // 定义事件
 const emit = defineEmits(['reasoning-expand-change', 'operation']);
 
+// 文件下载相关状态
+const showDownloadDialog = ref(false);
+const downloadDialogContent = ref('');
+const currentFile = ref(null);
+const processedFiles = ref([]);  // 处理过的文件列表，包含完整的文件信息
+const loadingFiles = ref(false);  // 是否正在加载文件信息
+
 // 处理操作事件，确保正确传递参数
 const handleOperation = (type, options) => {
     emit('operation', type, options);
@@ -143,7 +164,21 @@ onMounted(() => {
     dotsInterval = setInterval(() => {
         dotsCount.value = (dotsCount.value % 6) + 1;
     }, 100);
+    
+    // 组件挂载时加载文件信息
+    if (props.files && props.files.length > 0) {
+        fetchFilesInfo();
+    }
 });
+
+// 监听文件数组变化
+watch(() => props.files, (newFiles) => {
+    if (newFiles && newFiles.length > 0) {
+        fetchFilesInfo();
+    } else {
+        processedFiles.value = [];
+    }
+}, { deep: true });
 
 // 清理定时器
 onUnmounted(() => {
@@ -151,6 +186,75 @@ onUnmounted(() => {
         clearInterval(dotsInterval);
     }
 });
+
+// 获取并处理所有文件的信息
+const fetchFilesInfo = async () => {
+    if (!props.files || props.files.length === 0 || loadingFiles.value) return;
+    
+    loadingFiles.value = true;
+    
+    try {
+        // 复制文件数组并添加更多数据
+        const filesWithInfo = [...props.files];
+        
+        // 遍历并获取每个文件的详细信息
+        for (let i = 0; i < filesWithInfo.length; i++) {
+            const file = filesWithInfo[i];
+            
+            // 如果文件对象已经包含完整信息，则不需要获取
+            if (file.filename && file.file_type && file.file_size) {
+                continue;
+            }
+            
+            // 确保文件有ID
+            const fileId = file.id || file.file_id;
+            if (!fileId) continue;
+            
+            try {
+                // 获取文件详情
+                const fileDetail = await getFileDetail(fileId);
+                
+                if (fileDetail && fileDetail.file) {
+                    // 使用服务器返回的文件信息更新本地数据
+                    filesWithInfo[i] = {
+                        ...file,
+                        ...fileDetail.file,
+                        // 确保id字段存在
+                        id: fileId,
+                        // 确保filename字段存在
+                        filename: fileDetail.file.filename || file.filename || `文件(${fileId.substring(0, 8)}...)`,
+                        // 确保file_type字段存在
+                        file_type: fileDetail.file.file_type || getFileTypeFromExtension(fileDetail.file.filename || file.filename || '')
+                    };
+                }
+            } catch (error) {
+                console.error(`获取文件 ${fileId} 详情失败:`, error);
+                // 出错时保留原始文件信息，确保显示默认值
+                filesWithInfo[i] = {
+                    ...file,
+                    filename: file.filename || `文件(${fileId.substring(0, 8)}...)`,
+                    file_type: getFileTypeFromExtension(file.filename || '')
+                };
+            }
+        }
+        
+        // 更新处理后的文件列表
+        processedFiles.value = filesWithInfo;
+    } catch (error) {
+        console.error('处理文件信息失败:', error);
+    } finally {
+        loadingFiles.value = false;
+    }
+};
+
+// 从文件扩展名推断文件类型
+const getFileTypeFromExtension = (filename) => {
+    const extension = getFileExtension(filename);
+    if (!extension) return 'document';
+    
+    // 使用之前定义的映射
+    return fileTypeMap[extension] || 'document';
+};
 
 // 获取文件扩展名
 const getFileExtension = (filename) => {
@@ -277,6 +381,121 @@ const formatFileName = (fileName) => {
     if (name.length <= 5) return fileName; // 如果名称部分已经很短，保留全名
     return name.slice(0, 5) + '...' + extension;
 };
+
+// 处理文件点击事件
+const handleFileClick = async (file) => {
+    if (!file || !file.id) {
+        MessagePlugin.error('文件信息不完整，无法下载');
+        return;
+    }
+
+    try {
+        // 保存当前文件信息
+        currentFile.value = file;
+        
+        // 如果文件已经有完整信息，直接使用
+        if (file.filename && file.file_size && file.file_type) {
+            downloadDialogContent.value = `您确定要下载 "${file.filename}" 吗？
+文件大小: ${formatFileSize(file.file_size || 0)}
+文件类型: ${file.file_type || '未知'}`;
+            
+            // 显示确认对话框
+            showDownloadDialog.value = true;
+            return;
+        }
+        
+        // 否则获取文件详情
+        const fileDetail = await getFileDetail(file.id);
+        
+        if (fileDetail && fileDetail.file) {
+            // 更新当前文件对象以包含完整信息
+            currentFile.value = {...file, ...fileDetail.file};
+            
+            // 更新对话框内容
+            downloadDialogContent.value = `您确定要下载 "${fileDetail.file.filename}" 吗？
+文件大小: ${formatFileSize(fileDetail.file.file_size || 0)}
+文件类型: ${fileDetail.file.file_type || '未知'}`;
+            
+            // 显示确认对话框
+            showDownloadDialog.value = true;
+        } else {
+            MessagePlugin.error('获取文件详情失败');
+        }
+    } catch (error) {
+        console.error('文件点击处理失败:', error);
+        MessagePlugin.error('获取文件信息失败');
+    }
+};
+
+// 格式化文件大小
+const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// 获取文件详情
+const getFileDetail = async (fileId) => {
+    try {
+        const userId = ensureUserId();
+        const url = createApiUrl(`/base_agent/file-detail`, API_CONFIG.langchainBaseURL);
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                file_id: fileId,
+                user_id: userId
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`获取文件详情失败: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('获取文件详情失败:', error);
+        throw error;
+    }
+};
+
+// 下载文件
+const downloadFile = async () => {
+    if (!currentFile.value || !currentFile.value.id) {
+        MessagePlugin.error('文件信息不完整，无法下载');
+        return;
+    }
+    
+    try {
+        const userId = ensureUserId();
+        const fileId = currentFile.value.id;
+        
+        // 构建下载URL
+        const url = createApiUrl(`/base_agent/download-file/${fileId}?user_id=${userId}`, API_CONFIG.langchainBaseURL);
+        
+        // 创建临时链接并触发下载
+        const link = document.createElement('a');
+        link.href = url.toString();
+        link.setAttribute('download', currentFile.value.filename || 'download');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        MessagePlugin.success('开始下载文件');
+    } catch (error) {
+        console.error('下载文件失败:', error);
+        MessagePlugin.error('下载文件失败');
+    } finally {
+        // 重置下载状态
+        showDownloadDialog.value = false;
+        currentFile.value = null;
+    }
+};
 </script>
 
 <style lang="scss">
@@ -361,7 +580,6 @@ const formatFileName = (fileName) => {
     border-radius: 12px;
     transition: transform 0.2s ease, margin-left 0.2s ease, z-index 0s linear 0s, border-color 0.2s ease, background-color 0.2s ease;
     cursor: pointer;
-    box-sizing: border-box;
 
     &:first-child {
         margin-left: 0;

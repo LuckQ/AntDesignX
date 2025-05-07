@@ -89,7 +89,13 @@ export const sendChatRequest = async(api, requestData, callbacks = {}) => {
 
         // 添加文件IDs (如果有)
         if (files && files.length > 0) {
-            body.file_ids = files.map(file => file.id);
+            // 修复：正确提取文件ID，支持多种格式的文件对象
+            body.file_ids = files.map(file => {
+                // 优先使用file_id，其次是upload_file_id，最后是id
+                return file.file_id || file.upload_file_id || file.id || null;
+            }).filter(id => id !== null); // 过滤掉无效的ID
+
+            console.log('文件ID列表:', body.file_ids);
         }
 
         console.log('发送聊天请求到:', apiUrl);

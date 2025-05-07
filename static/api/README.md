@@ -92,4 +92,144 @@ const searchResults = await searchDataset(datasetId, {
     top_k: 5,
     reranking: true
 });
+```
+
+## 文件操作相关API
+
+### 文件上传API
+
+**端点**: `/base_agent/upload-file`
+**方法**: `POST`
+**格式**: `multipart/form-data`
+
+请求参数:
+- `file`: 文件对象（必需）
+- `user_id`: 用户ID（必需）
+
+响应示例:
+```json
+{
+  "file": {
+    "file_id": "f1234567890abcdef",
+    "user_id": "user123",
+    "filename": "example.pdf",
+    "file_path": "/storage/uploads/example.pdf",
+    "file_size": 12345,
+    "file_type": "application/pdf",
+    "upload_time": "2023-11-15T10:30:00",
+    "metadata": {}
+  },
+  "status": "success",
+  "message": "文件上传成功"
+}
+```
+
+### 文件列表API
+
+**端点**: `/base_agent/list-files`
+**方法**: `GET`
+
+查询参数:
+- `user_id`: 用户ID（必需）
+- `page`: 页码，默认为1
+- `page_size`: 每页数量，默认为10
+
+响应示例:
+```json
+{
+  "files": [
+    {
+      "file_id": "f1234567890abcdef",
+      "user_id": "user123",
+      "filename": "example.pdf",
+      "file_size": 12345,
+      "file_type": "application/pdf",
+      "upload_time": "2023-11-15T10:30:00"
+    }
+  ],
+  "total": 15,
+  "page": 1,
+  "page_size": 10,
+  "status": "success"
+}
+```
+
+### 文件详情API
+
+**端点**: `/base_agent/file-detail/{file_id}`
+**方法**: `GET`
+
+查询参数:
+- `user_id`: 用户ID（必需）
+
+响应示例:
+```json
+{
+  "file": {
+    "file_id": "f1234567890abcdef",
+    "user_id": "user123",
+    "filename": "example.pdf",
+    "file_path": "/storage/uploads/example.pdf",
+    "file_size": 12345,
+    "file_type": "application/pdf",
+    "upload_time": "2023-11-15T10:30:00",
+    "metadata": {
+      "pages": 5,
+      "author": "Test User"
+    }
+  },
+  "status": "success"
+}
+```
+
+### 文件下载API
+
+**端点**: `/base_agent/download-file/{file_id}`
+**方法**: `GET`
+
+查询参数:
+- `user_id`: 用户ID（必需）
+
+响应: 文件内容（二进制流）
+
+### 文件删除API
+
+**端点**: `/base_agent/delete-file/{file_id}`
+**方法**: `DELETE`
+
+查询参数:
+- `user_id`: 用户ID（必需）
+
+响应示例:
+```json
+{
+  "status": "success",
+  "message": "文件删除成功",
+  "file_id": "f1234567890abcdef"
+}
+```
+
+### 附加文件到消息API
+
+**端点**: `/base_agent/attach-files`
+**方法**: `POST`
+**格式**: `application/json`
+
+请求体:
+```json
+{
+  "file_ids": ["f1234567890abcdef", "f0987654321fedcba"],
+  "message_id": "msg123456",
+  "user_id": "user123"
+}
+```
+
+响应示例:
+```json
+{
+  "status": "success",
+  "message": "文件已成功附加到消息",
+  "message_id": "msg123456",
+  "file_ids": ["f1234567890abcdef", "f0987654321fedcba"]
+}
 ``` 

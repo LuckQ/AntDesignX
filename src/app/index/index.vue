@@ -149,6 +149,14 @@ import {
 // TODO云桌面
 // import { useUserStoreWithOut } from '@/store/modules/user';
 // const userStore = useUserStoreWithOut();
+import {
+    uploadFile,
+    getUserFiles,
+    getFileDetail,
+    deleteFile,
+    getFileDownloadUrl,
+    attachFilesToMessage
+} from '/static/api/files.js'; // 导入文件操作API
 
 /*————————————————————————————————————————————————基础状态变量————————————————————————————————————————————————*/
 const fetchCancel = ref(null); // 用于取消请求的AbortController

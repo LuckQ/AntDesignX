@@ -35,11 +35,12 @@
 import { ref, onUnmounted } from 'vue';
 import { MessagePlugin, DialogPlugin, Progress as TProgress, Tag as TTag, Space as TSpace, Button as TButton } from 'tdesign-vue-next';
 import { API_CONFIG } from '/static/api/config.js';
+import { uploadFile } from '/static/api/files.js';
 import CustomChatInput from './CustomChatInput.vue';
-import {createApiUrl} from '/static/api/config.js'
 // TODO云桌面
 // import { useUserStoreWithOut } from '@/store/modules/user';
 // const userStore = useUserStoreWithOut();
+
 const props = defineProps({
   loading: {
     type: Boolean,
@@ -52,7 +53,7 @@ const query = ref('');
 const fileInput = ref<HTMLInputElement | null>(null);
 const isUploading = ref(false);
 const uploadProgress = ref(0);
-const uploadedFiles = ref<Array<{ id: string, name: string, size: number, extension: string, mime_type: string }>>([]);
+const uploadedFiles = ref<Array<{ id: string, name: string, size: number, extension: string, file_type: string }>>([]);
 
 // 支持的文件类型
 const supportedExtensions = ['txt', 'md', 'mdx', 'pdf', 'html', 'xlsx', 'xls', 'docx', 'csv', 'htm', 'markdown'];
@@ -97,8 +98,9 @@ const handleSend = (value: string) => {
   const files = uploadedFiles.value.map(file => ({
     type: 'document', // 所有支持的类型都是文档类型
     transfer_method: 'local_file',
-    upload_file_id: file.id,
-    // 使用filename属性以与chat.js一致
+    file_id: file.id, // 使用file_id作为主键，保持与后端API一致
+    // 以下是附加信息，供UI展示使用
+    upload_file_id: file.id, // 兼容性字段
     filename: file.name,
     name: file.name,
     extension: file.extension,
@@ -211,46 +213,36 @@ const handleFileSelected = async (event: Event) => {
   uploadProgress.value = 0;
 
   try {
-    // 准备FormData
-    const formData = new FormData();
-    formData.append('file', file);
-    // TODO云桌面
-    // const userInfo = userStore.getUserInfo;
-    const userInfo = {userId: 'user123'};
-
-    formData.append('user', userInfo.userId || 'anonymous');
-
     // 模拟进度
     const progressInterval = setInterval(() => {
       if (uploadProgress.value < 90) {
         uploadProgress.value += 5;
       }
     }, 100);
-    const url = createApiUrl('/files/upload');
-    // 发送上传请求
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${API_CONFIG.apiKey}`
-      },
-      body: formData
-    });
+
+    // TODO云桌面
+    // const userInfo = userStore.getUserInfo;
+    const userInfo = {userId: 'user123'};
+    const userId = userInfo.userId || 'anonymous';
+
+    // 使用新的文件上传API
+    const result = await uploadFile(file, userId);
+    
     clearInterval(progressInterval);
     uploadProgress.value = 100;
 
-    if (!response.ok) {
-      throw new Error(`上传失败: ${response.status} ${response.statusText}`);
+    if (result.status !== 'success') {
+      throw new Error(result.message || '上传失败');
     }
 
-    const result = await response.json();
-
-    // 添加到上传文件列表
+    // 添加到上传文件列表 - 适配新的响应结构
+    const fileData = result.file;
     uploadedFiles.value.push({
-      id: result.id,
-      name: result.name,
-      size: result.size,
-      extension: result.extension,
-      mime_type: result.mime_type
+      id: fileData.file_id,
+      name: fileData.filename,
+      size: fileData.file_size,
+      extension: fileData.filename.split('.').pop() || '',
+      file_type: fileData.file_type
     });
 
     // 显示成功消息
