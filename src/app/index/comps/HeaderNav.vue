@@ -17,10 +17,13 @@
 
         <!-- 添加模型选择下拉菜单 -->
         <div class="model-selector">
-            <t-dropdown :options="modelOptions" @click="handleModelChange" trigger="click" maxColumnWidth="300px">
+            <t-dropdown :options="modelOptions" @click="handleModelChange" trigger="click" maxColumnWidth="300px" :loading="loadingModels">
                 <t-button variant="text" class="model-select-btn">
                     <template v-if="currentModel">
                         <span class="model-name">{{ currentModel.name }}</span>
+                    </template>
+                    <template v-else>
+                        <span class="model-name">{{ loadingModels ? '加载中...' : (modelOptions.length > 0 ? '选择模型' : '无可用模型') }}</span>
                     </template>
                     <t-icon name="chevron-down" />
                 </t-button>
@@ -40,7 +43,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { API_CONFIG, switchModel } from '/static/api/config.js';
+import { API_CONFIG, switchModel, fetchAvailableModels } from '/static/api/config.js';
 
 defineProps({
     title: {
@@ -55,20 +58,24 @@ defineProps({
 
 const emit = defineEmits(['open-drawer', 'new-conversation', 'model-changed']);
 
-// 当前选中的模型
-const currentModelId = ref(API_CONFIG.defaultModel);
+// 本地响应式模型列表
+const localModels = ref([]);
+// 当前选中的模型ID
+const currentModelId = ref('');
+// 模型加载状态
+const loadingModels = ref(true);
 
-// 计算当前模型对象
+// 计算当前选中的模型对象 (基于本地响应式列表)
 const currentModel = computed(() => {
-    return API_CONFIG.models.find(model => model.id === currentModelId.value);
+    return localModels.value.find(model => model.id === currentModelId.value);
 });
 
-// 转换模型数据为下拉选项格式
+// 转换模型数据为下拉选项格式 (基于本地响应式列表)
 const modelOptions = computed(() => {
-    return API_CONFIG.models.map(model => ({
+    return localModels.value.map(model => ({
         content: model.name,
         value: model.id,
-        prefixIcon: model.icon
+        // prefixIcon: model.icon, // 新API模型没有icon字段，移除或根据需要调整
     }));
 });
 
@@ -77,13 +84,14 @@ const handleModelChange = (data: { value: string }) => {
     const newModelId = data.value;
     if (newModelId !== currentModelId.value) {
         currentModelId.value = newModelId;
-        // 调用切换模型API
+        // 调用config.js中的switchModel来更新全局API_CONFIG.currentModel
         const config = switchModel(newModelId);
         if (config) {
-            // 通知父组件模型已更改
+            // 从本地响应式列表中找到当前模型对象并emit
+            const selectedModelObject = localModels.value.find(m => m.id === newModelId);
             emit('model-changed', {
                 modelId: newModelId,
-                model: currentModel.value
+                model: selectedModelObject
             });
         }
     }
@@ -95,31 +103,59 @@ const getModelIdFromUrl = () => {
     return urlParams.get('model');
 };
 
-// 组件挂载时，从URL获取模型参数
-onMounted(() => {
-    // 优先从URL中获取模型ID
-    const urlModelId = getModelIdFromUrl();
-    
-    // 检查URL中的模型是否存在于可用模型列表中
-    if (urlModelId && API_CONFIG.models.some(model => model.id === urlModelId)) {
-        // URL中的模型ID有效，使用它
-        currentModelId.value = urlModelId;
-        // 调用切换模型API
-        const config = switchModel(urlModelId);
-        if (config) {
-            // 通知父组件模型已更改
-            emit('model-changed', {
-                modelId: urlModelId,
-                model: API_CONFIG.models.find(model => model.id === urlModelId)
-            });
+// 初始化模型列表和选定模型
+const initModelList = async () => {
+    try {
+        loadingModels.value = true;
+        // 调用API获取模型列表 (fetchAvailableModels内部会更新API_CONFIG.models和API_CONFIG.defaultModel)
+        const fetchedModels = await fetchAvailableModels();
+
+        if (fetchedModels && fetchedModels.length > 0) {
+            // 将获取到的模型列表赋值给本地响应式ref
+            localModels.value = fetchedModels;
+
+            const urlModelId = getModelIdFromUrl();
+            let modelIdToSet = '';
+
+            // 决定初始选中的模型ID的逻辑：URL参数 > API默认 > 列表第一个
+            if (urlModelId && localModels.value.some(model => model.id === urlModelId)) {
+                modelIdToSet = urlModelId;
+            } else if (API_CONFIG.defaultModel && localModels.value.some(model => model.id === API_CONFIG.defaultModel)) {
+                modelIdToSet = API_CONFIG.defaultModel;
+            } else if (localModels.value.length > 0) {
+                modelIdToSet = localModels.value[0].id;
+            }
+
+            if (modelIdToSet) {
+                currentModelId.value = modelIdToSet;
+                // 更新全局配置中的当前模型
+                const config = switchModel(modelIdToSet);
+                if (config) {
+                    // Emit事件，让父组件知道模型已更改
+                    const selectedModelObject = localModels.value.find(m => m.id === modelIdToSet);
+                    emit('model-changed', {
+                        modelId: modelIdToSet,
+                        model: selectedModelObject
+                    });
+                }
+            } else {
+                console.warn('无法确定初始选中的模型ID，模型列表可能为空或不包含默认/URL指定模型。');
+            }
+        } else {
+            console.error('未能获取到模型列表，或模型列表为空。');
+            localModels.value = []; // 获取失败则清空本地列表
         }
-    } else if (API_CONFIG.currentModel) {
-        // 如果URL中没有模型ID或无效，但API_CONFIG中已有currentModel，则使用它
-        currentModelId.value = API_CONFIG.currentModel;
-    } else {
-        // 否则使用默认模型并初始化
-        switchModel(currentModelId.value);
+    } catch (error) {
+        console.error('初始化模型列表时发生错误:', error);
+        localModels.value = []; // 出错则清空本地列表
+    } finally {
+        loadingModels.value = false;
     }
+};
+
+// 组件挂载时，初始化模型列表
+onMounted(() => {
+    initModelList();
 });
 
 </script>
@@ -252,11 +288,10 @@ onMounted(() => {
 
         &.menu-icon-hidden {
             opacity: 0;
-            transform: scale(0.8);
+            transform: scale(0);
             max-width: 0;
             min-width: 0;
-            padding-left: 0;
-            padding-right: 0;
+            padding: 0;
             margin-right: 0;
             overflow: hidden;
         }

@@ -30,40 +30,38 @@ export const ensureUserId = () => {
 /**
  * 获取服务器会话列表
  * @param {Object} options - 选项参数
- * @param {String} options.last_id - 当前页最后面一条记录的ID
- * @param {Number} options.limit - 一次请求返回多少条记录
- * @param {String} options.sort_by - 排序字段
+ * @param {String} options.last_id - 当前页最后面一条记录的ID (旧版API参数，不再使用)
+ * @param {Number} options.limit - 一次请求返回多少条记录 (现用作page_size)
+ * @param {String} options.sort_by - 排序字段 (旧版API参数，不再使用)
+ * @param {Number} options.page - 页码，从1开始
  * @returns {Promise<Array>} 会话列表数组
  */
 export const getServerConversations = async(options = {}) => {
     try {
         const userId = ensureUserId();
 
-        // 使用工具函数创建URL
-        const url = createApiUrl('/conversations');
+        // 使用 LangChain API 的新接口
+        // 使用 createApiUrl 函数正确构建 URL
+        const url = createApiUrl(`/base_agent/list-chats`, API_CONFIG.langchainBaseURL);
 
         // 添加用户ID，必选参数
-        url.searchParams.append('user', userId);
+        url.searchParams.append('user_id', userId);
 
-        // 添加可选参数
-        if (options.last_id) {
-            url.searchParams.append('last_id', options.last_id);
-        }
+        // 添加页码，默认为1
+        const page = options.page || 1;
+        url.searchParams.append('page', page);
 
-        if (options.limit) {
-            url.searchParams.append('limit', options.limit);
-        }
+        // 添加每页条数，默认使用原先的limit参数或10
+        const pageSize = options.limit || 20;
+        url.searchParams.append('page_size', pageSize);
 
-        if (options.sort_by) {
-            url.searchParams.append('sort_by', options.sort_by);
-        }
+        console.log('获取会话列表URL:', url.toString());
 
         const response = await fetch(url, {
             method: 'GET',
             headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${API_CONFIG.apiKey}`,
-            },
+                'Content-Type': 'application/json'
+            }
         });
 
         if (!response.ok) {
@@ -72,17 +70,31 @@ export const getServerConversations = async(options = {}) => {
         }
 
         const data = await response.json();
+        console.log('获取会话列表返回:', data);
 
-        // 按时间顺序排序会话，最新的在前面
-        if (data && Array.isArray(data.data)) {
-            data.data.sort((a, b) => {
-                const dateA = new Date(a.created_at || 0);
-                const dateB = new Date(b.created_at || 0);
+        // 将新API格式转换为应用原有格式
+        // 新API返回: { user_id, chats: [{session_id, user_id, created_at, last_message, features, title}], total, page, page_size }
+        // 旧格式期望: 会话对象数组 [{id, name, created_at, updated_at, ...}]
+        if (data && Array.isArray(data.chats)) {
+            // 对会话列表按created_at降序排序
+            const sortedChats = data.chats.sort((a, b) => {
+                const dateA = new Date(a.created_at);
+                const dateB = new Date(b.created_at);
                 return dateB - dateA;
             });
+
+            return sortedChats.map(chat => ({
+                id: chat.session_id, // 新API中session_id对应旧API的id
+                name: chat.title || '新对话', // 使用title作为名称，如果没有则默认为"新对话"
+                created_at: chat.created_at, // 创建时间保持一致
+                updated_at: chat.created_at, // 更新时间和创建时间保持一致
+                last_message: chat.last_message || '', // 最后消息
+                // 保留原有字段
+                ...chat
+            }));
         }
 
-        return data.data || [];
+        return [];
     } catch (error) {
         console.error('获取会话列表失败:', error);
         return [];
@@ -143,22 +155,26 @@ export const getServerConversationHistory = async(conversationId, options = {}) 
     try {
         const userId = ensureUserId();
 
-        // 构建URL
-        const { page = 1, pageSize = 20 } = options;
+        // 使用 LangChain API 的新接口
+        // 使用 createApiUrl 函数正确构建 URL
+        const url = createApiUrl(`/base_agent/chat-history`, API_CONFIG.langchainBaseURL);
 
-        // 使用工具函数创建URL
-        const url = createApiUrl('/messages');
-        url.searchParams.append('conversation_id', conversationId);
-        url.searchParams.append('user', userId);
-        url.searchParams.append('page', page);
-        url.searchParams.append('page_size', pageSize);
+        // 构建请求体
+        const requestBody = {
+            session_id: conversationId,
+            user_id: userId,
+            page: options.page || 1,
+            page_size: options.pageSize || 20
+        };
+
+        console.log('获取会话历史请求:', requestBody);
 
         const response = await fetch(url, {
-            method: 'GET',
+            method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${API_CONFIG.apiKey}`,
+                'Content-Type': 'application/json'
             },
+            body: JSON.stringify(requestBody),
             // 添加AbortController的signal支持
             signal: options.signal,
         });
@@ -169,10 +185,11 @@ export const getServerConversationHistory = async(conversationId, options = {}) 
         }
 
         const data = await response.json();
+        console.log('获取会话历史返回:', data);
 
-        if (data && data.data && Array.isArray(data.data)) {
+        if (data && data.messages && Array.isArray(data.messages)) {
             // 转换服务器格式为应用程序格式
-            return convertServerMessagesToAppFormat(data.data, conversationId);
+            return convertServerMessagesToAppFormat(data.messages, conversationId);
         }
 
         return [];
@@ -194,80 +211,78 @@ export const getServerConversationHistory = async(conversationId, options = {}) 
  * @returns {Array} 格式化后的消息数组
  */
 const convertServerMessagesToAppFormat = (serverMessages, conversationId) => {
+    // 创建头像URL
+    const assistantImg = new URL('../files/favicon.png',
+        import.meta.url).href;
+    const userImg = 'https://tdesign.gtimg.com/site/avatar.jpg';
+    const systemImg = new URL('../files/favicon.png',
+        import.meta.url).href;
+
     // 结果数组，将包含格式化后的消息
     const formattedMessages = [];
 
     // 分析服务器返回的每条消息
     for (const msg of serverMessages) {
-        // 如果有query字段，创建用户消息
-        if (msg.query) {
-            // 创建基本用户消息
+        // 根据消息类型创建相应的消息对象
+        if (msg.role === 'user') {
+            // 创建用户消息
             const userMessage = {
-                avatar: 'https://tdesign.gtimg.com/site/avatar.jpg', // 用户头像
+                avatar: userImg, // 用户头像
                 name: '自己',
-                datetime: new Date(msg.created_at * 1000).toLocaleString(),
-                content: msg.query,
+                content: msg.content || msg.message || '', // 兼容不同字段名
                 role: 'user',
-                id: msg.id + '_user',
+                id: msg.id || `${Date.now()}_user`,
             };
 
-            // 如果有files字段，添加到用户消息中
+            // 如果有文件信息，添加到用户消息中
             if (msg.files && Array.isArray(msg.files) && msg.files.length > 0) {
                 userMessage.files = msg.files.map(file => ({
-                    id: file.id,
+                    id: file.id || file.file_id,
                     filename: file.filename || file.name,
                     type: file.type || 'document',
                     size: file.size || 0,
                     url: file.url || '',
                 }));
-            }
-
-            // 如果有message_files字段，添加到用户消息中
-            if (msg.message_files && Array.isArray(msg.message_files) && msg.message_files.length > 0) {
-                if (!userMessage.files) {
-                    userMessage.files = [];
-                }
-
-                msg.message_files.forEach(file => {
-                    userMessage.files.push({
-                        id: file.id,
-                        filename: file.filename || file.name,
-                        type: file.type || 'document',
-                        size: file.size || 0,
-                        url: file.url || '',
-                    });
-                });
+            } else if (msg.file_ids && Array.isArray(msg.file_ids) && msg.file_ids.length > 0) {
+                // 如果只有文件ID数组，转换为文件对象数组
+                userMessage.files = msg.file_ids.map(fileId => ({
+                    id: fileId,
+                    filename: `文件ID: ${fileId}`,
+                    type: 'document',
+                }));
             }
 
             formattedMessages.push(userMessage);
-        }
-
-
-        // 如果有answer字段，创建助手消息
-        if (msg.answer) {
+        } else if (msg.role === 'assistant' || msg.role === 'ai') {
+            // 处理AI助手消息
             // 提取思考内容
-            const { content, reasoning } = extractThinkingContent(msg.answer);
-            const img = new URL('../files/favicon.png',
-                    import.meta.url).href
-                // 创建基本助手消息
+            const { content, reasoning } = extractThinkingContent(msg.content || '');
             const assistantMessage = {
-                avatar: img, // 助手头像
+                avatar: assistantImg, // 助手头像
                 name: '百年金钟，智启未来',
-                datetime: new Date(msg.created_at * 1000).toLocaleString(),
-                content: content || '',
+                content: content || msg.message || '', // 兼容不同字段名
+                reasoning: reasoning, // 提取的思考内容
                 role: 'assistant',
-                ...(reasoning ? { reasoning } : {}), // 只有有思考内容时才添加
-                id: msg.id + '_assistant',
+                id: msg.id || `${Date.now()}_assistant`,
             };
 
             formattedMessages.push(assistantMessage);
+        } else if (msg.role === 'system') {
+            // 系统消息，一般不显示给用户，但依然添加到格式化消息列表
+            const systemMessage = {
+                avatar: systemImg,
+                name: '系统',
+                content: msg.content || msg.message || '',
+                role: 'system',
+                id: msg.id || `${Date.now()}_system`,
+            };
+
+            formattedMessages.push(systemMessage);
         }
     }
 
-    // 后端API是倒序返回的(最新的在前面)，但前端显示需要正序，所以需要反转
-    formattedMessages.reverse();
-
-    return formattedMessages;
+    // 返回反转后的消息数组，使最新的消息显示在前面
+    return formattedMessages.reverse();
 };
 
 /**
@@ -429,7 +444,7 @@ export const createUserMessage = (content, files = []) => {
  */
 export const createAssistantMessage = (isDeepThinking = false) => {
     const img = new URL('../files/favicon.png',
-        import.meta.url).href
+        import.meta.url).href;
     const baseMessage = {
         avatar: img,
         name: '百年金钟，智启未来',
@@ -678,32 +693,33 @@ export const renameConversation = async(conversationId, options = {}) => {
     const userId = ensureUserId();
 
     try {
+        // 使用新的更新标题接口
+        const url = createApiUrl(`/base_agent/update-title`, API_CONFIG.langchainBaseURL);
+
         // 创建请求体
         const requestBody = {
-            user: userId,
+            session_id: conversationId,
+            user_id: userId,
+            title: options.name // 使用name作为新标题
         };
 
-        // 添加name或auto_generate
+        // 如果是自动生成标题，添加auto_generate标志
         if (options.auto_generate) {
             requestBody.auto_generate = true;
-        } else if (options.name) {
-            requestBody.name = options.name;
         }
 
         console.log(`[重命名] 尝试重命名会话 ${conversationId}`, {
             auto_generate: options.auto_generate,
-            name: options.name,
-            API地址: `${API_CONFIG.baseURL}/conversations/${conversationId}/name`,
+            title: options.name,
+            API地址: url.toString()
         });
 
-        const url = createApiUrl("/conversations")
-        const response = await fetch(`${url}/${conversationId}/name`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${API_CONFIG.apiKey}`,
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(requestBody)
         });
 
         // 获取响应文本，无论成功还是失败
@@ -720,7 +736,6 @@ export const renameConversation = async(conversationId, options = {}) => {
 
         if (!response.ok) {
             console.error(`[重命名] 重命名会话失败: ${response.status}`, responseData);
-            // 不抛出异常，而是返回错误对象
             return {
                 success: false,
                 status: response.status,
@@ -730,13 +745,17 @@ export const renameConversation = async(conversationId, options = {}) => {
         }
 
         console.log(`[重命名] 会话重命名成功: ${conversationId}`, responseData);
+
+        // 返回统一的成功响应格式
         return {
             success: true,
-            ...responseData,
+            name: responseData.title, // 使用返回的title作为name
+            title: responseData.title,
+            status: responseData.status,
+            message: responseData.message || '会话标题已更新'
         };
     } catch (error) {
         console.error('[重命名] 重命名会话错误:', error);
-        // 不抛出异常，返回错误信息
         return {
             success: false,
             error: error,
@@ -754,18 +773,24 @@ export const deleteConversation = async conversationId => {
     const userId = ensureUserId();
 
     try {
+        // 使用 LangChain API 的新接口
+        // 使用 createApiUrl 函数正确构建 URL
+        const url = createApiUrl(`/base_agent/delete-chat`, API_CONFIG.langchainBaseURL);
+
         // 创建请求体
         const requestBody = {
-            user: userId,
+            session_id: conversationId,
+            user_id: userId
         };
-        const url = createApiUrl('/conversations');
-        const response = await fetch(`${url}/${conversationId}`, {
+
+        console.log('删除会话请求:', requestBody);
+
+        const response = await fetch(url, {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${API_CONFIG.apiKey}`,
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -774,6 +799,7 @@ export const deleteConversation = async conversationId => {
         }
 
         const data = await response.json();
+        console.log('删除会话返回:', data);
         return data;
     } catch (error) {
         console.error('删除会话错误:', error);
@@ -839,33 +865,12 @@ export const saveChatHistory = () => {
  */
 export const getSuggestedQuestions = async messageId => {
     try {
-        const userId = ensureUserId();
-
-        // 使用正确的API端点
-        const url = createApiUrl(`/messages/${messageId}/suggested`);
-        url.searchParams.append('user', userId);
-
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${API_CONFIG.apiKey}`,
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`获取建议问题失败: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // 检查返回数据结构
-        if (data && data.data && Array.isArray(data.data)) {
-            // 返回建议问题列表
-            return data.data;
-        } else {
-            return [];
-        }
+        // 返回固定的三个建议问题
+        return [
+            "介绍一下金钟集团",
+            "金钟集团有哪些产品",
+            "金钟集团的优势"
+        ];
     } catch (error) {
         console.error('获取建议问题失败:', error);
         return [];

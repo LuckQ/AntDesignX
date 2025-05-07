@@ -36,29 +36,25 @@ export const getModelInstance = () => {
  * @param {Object} options - 其他选项
  * @returns {Promise} 请求Promise
  */
-export const sendChatRequest = async (messages, options = {}) => {
+export const sendChatRequest = async(messages, options = {}) => {
     try {
         const userId = ensureUserId();
 
-        // 使用工具函数创建URL
-        const url = createApiUrl('/chat-messages');
-        
+        // 使用 LangChain API
+        const url = createApiUrl(`/base_agent/chat`, API_CONFIG.langchainBaseURL);
+
         // 获取最后一条用户消息
         const lastMessage = messages[messages.length - 1];
-        
+
         // 构建请求体
         const requestBody = {
             query: lastMessage.content, // 用最后一条消息作为query
-            user: userId,
+            user_id: userId,
+            model_id: API_CONFIG.currentModel || options.model_id,
             response_mode: 'streaming',
-            inputs: {},
+            conversation_id: options.conversation_id || '',
         };
-        
-        // 添加对话ID (如果存在)
-        if (options.conversation_id) {
-            requestBody.conversation_id = options.conversation_id;
-        }
-        
+
         // 添加文件列表 (如果存在)
         if (options.files && Array.isArray(options.files) && options.files.length > 0) {
             requestBody.files = options.files;
@@ -69,8 +65,7 @@ export const sendChatRequest = async (messages, options = {}) => {
         const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_CONFIG.apiKey}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestBody),
             signal: options.signal
@@ -92,14 +87,14 @@ export const sendChatRequest = async (messages, options = {}) => {
  * @param {Promise} responsePromise - 响应Promise
  * @param {Object} callbacks - 回调函数对象
  */
-export const handleStreamResponse = async (responsePromise, callbacks = {}) => {
+export const handleStreamResponse = async(responsePromise, callbacks = {}) => {
     const { onMessage, onError, onComplete, onReasoning, onWorkflowSteps, onConversationIdChange, onMessageIdChange, onTaskIdChange, onFileEvent } = callbacks;
 
     try {
         // 检查responsePromise是否已经被中断
         if (responsePromise.signal && responsePromise.signal.aborted) {
             console.log('[Stream] 请求已中断');
-            onComplete?.(false, '请求已中断');
+            onComplete(false, '请求已中断');
             return;
         }
 
@@ -150,12 +145,6 @@ export const handleStreamResponse = async (responsePromise, callbacks = {}) => {
                     try {
                         const data = JSON.parse(line.substring(6));
 
-                        // 输出事件类型
-                        // if (data.event) {
-                        //     console.log(`%c[Stream Event] 收到事件: ${data.event}`, 'color: #4CAF50; font-weight: bold;');
-                        //     console.log('%c[Stream Data]', 'color: #2196F3; font-weight: bold;', data);
-                        // }
-
                         // 保存会话ID，不使用localStorage
                         if (data.conversation_id && !conversation_id) {
                             conversation_id = data.conversation_id;
@@ -166,7 +155,7 @@ export const handleStreamResponse = async (responsePromise, callbacks = {}) => {
                             }
                         }
 
-                        // 处理Dify API返回格式
+                        // 处理 LangChain API 返回格式
                         if (data.event === 'message') {
                             const answer = data.answer || '';
 
@@ -175,23 +164,23 @@ export const handleStreamResponse = async (responsePromise, callbacks = {}) => {
                                 isInThinkingMode = true;
                                 const thinkContent = answer.replace('<think>', '');
                                 console.log('%c[Stream] 进入思考模式', 'color: #FF9800; font-weight: bold;');
-                                onReasoning?.(thinkContent);
+                                onReasoning(thinkContent);
                             } else if (answer.includes('</think>')) {
                                 const parts = answer.split('</think>');
                                 console.log('%c[Stream] 结束思考模式', 'color: #FF9800; font-weight: bold;');
-                                onReasoning?.(parts[0]);
+                                onReasoning(parts[0]);
 
                                 isInThinkingMode = false;
 
                                 if (parts.length > 1) {
-                                    onMessage?.(parts[1]);
+                                    onMessage(parts[1]);
                                 }
                             } else if (isInThinkingMode) {
                                 // 在思考模式中
-                                onReasoning?.(answer);
+                                onReasoning(answer);
                             } else {
                                 // 普通消息内容
-                                onMessage?.(answer);
+                                onMessage(answer);
                             }
                         } else if (data.event === 'message_end') {
                             console.log('%c[Stream] 收到消息结束事件: message_end', 'color: #4CAF50; font-weight: bold;');
@@ -208,7 +197,7 @@ export const handleStreamResponse = async (responsePromise, callbacks = {}) => {
                             }
                         } else if (data.event === 'message_file') {
                             console.log('%c[Stream] 收到文件事件: message_file', 'color: #4CAF50; font-weight: bold;');
-                            
+
                             // 处理文件事件数据
                             if (onFileEvent && data.file) {
                                 // 构建文件数据对象
@@ -219,14 +208,14 @@ export const handleStreamResponse = async (responsePromise, callbacks = {}) => {
                                     size: data.file.size || 0,
                                     url: data.file.url || ''
                                 };
-                                
+
                                 // 调用文件事件回调
                                 onFileEvent(fileData);
                             }
                         } else if (data.event === 'message_replace') {
                             console.log('%c[Stream] 收到消息替换事件: message_replace', 'color: #4CAF50; font-weight: bold;');
                             // 替换消息内容为审查后的内容
-                            onMessage?.(data.answer || '');
+                            onMessage(data.answer || '');
                         } else if (data.event === 'tts_message') {
                             console.log('%c[Stream] 收到TTS事件: tts_message', 'color: #4CAF50; font-weight: bold;');
                         } else if (data.event === 'tts_message_end') {
@@ -235,263 +224,224 @@ export const handleStreamResponse = async (responsePromise, callbacks = {}) => {
                             console.log('%c[Stream] 收到工作流开始事件: workflow_started', 'color: #4CAF50; font-weight: bold;');
                         } else if (data.event === 'node_started') {
                             console.log('%c[Stream] 收到节点开始事件: node_started', 'color: #4CAF50; font-weight: bold;');
-                            const nodeTitle = data.data?.title;
-                            const nodeId = data.data?.id || `node-${workflowSteps.length}`; // 获取或生成节点ID
-                            
+                            const nodeTitle = data.data.title;
+                            const nodeId = data.data.id || `node-${workflowSteps.length}`; // 获取或生成节点ID
+
                             if (nodeTitle) {
                                 // 添加：根据节点标题推断节点类型
                                 const inferNodeType = (title) => {
                                     const titleLower = title.toLowerCase();
-                                    
+
                                     if (titleLower === '开始') return 'start';
                                     if (titleLower.includes('http') || titleLower.includes('请求')) return 'http';
                                     if (titleLower.includes('条件') || titleLower.includes('分支')) return 'condition';
                                     if (titleLower.includes('时间')) return 'time';
                                     if (titleLower.includes('搜索')) return 'search';
-                                    if (titleLower.includes('提取') || titleLower.includes('参数')) return 'extract';
-                                    if (titleLower.includes('web') || titleLower.includes('bocha')) return 'web';
-                                    if (titleLower.includes('文件')) return 'file';
-                                    if (titleLower.includes('模型') || titleLower.includes('总结')) return 'model';
-                                    if (titleLower.includes('回复')) return 'reply';
-                                    if (titleLower.includes('错误')) return 'error';
-                                    
-                                    return 'default';
+                                    if (titleLower.includes('llm') || titleLower.includes('语言模型') || titleLower.includes('ai模型')) return 'llm';
+                                    if (titleLower.includes('提取') || titleLower.includes('解析')) return 'extract';
+                                    if (titleLower.includes('code') || titleLower.includes('代码')) return 'code';
+                                    if (titleLower.includes('工具') || titleLower.includes('function')) return 'tool';
+                                    if (titleLower.includes('结束') || titleLower.includes('end')) return 'end';
+                                    return 'default'; // 默认类型
                                 };
-                                
-                                // 优先使用API返回的类型，如果没有则根据标题推断
-                                const nodeType = data.data?.type || inferNodeType(nodeTitle);
-                                
-                                console.log('%c[Stream Node Started]', 'color: #2196F3; font-weight: bold;', { 
-                                    title: nodeTitle,
-                                    type: nodeType,
-                                    id: nodeId
-                                });
-                                
-                                // 如果存在上一个加载中的节点，将其标记为已完成
-                                if (currentLoadingNodeId) {
-                                    const prevNodeIndex = workflowSteps.findIndex(step => step.id === currentLoadingNodeId);
-                                    if (prevNodeIndex !== -1) {
-                                        workflowSteps[prevNodeIndex].loading = false;
-                                        
-                                        // 发送更新后的工作流步骤
-                                        if (onWorkflowSteps) {
-                                            onWorkflowSteps([...workflowSteps]);
-                                        }
-                                    }
-                                }
-                                
-                                // 使用对象格式添加新节点，并标记为加载中
-                                const nodeObj = {
-                                    title: nodeTitle,
-                                    node_type: nodeType,
+
+                                // 新节点对象
+                                const newStep = {
                                     id: nodeId,
-                                    loading: true // 新节点初始状态为加载中
+                                    title: nodeTitle,
+                                    status: 'loading',
+                                    type: inferNodeType(nodeTitle),
+                                    startTime: new Date().getTime()
                                 };
-                                
-                                workflowSteps.push(nodeObj);
-                                currentLoadingNodeId = nodeId; // 更新当前加载节点ID
-                                
+
+                                // 添加到工作流步骤数组
+                                workflowSteps.push(newStep);
+                                currentLoadingNodeId = nodeId;
+
+                                // 通知UI更新
                                 if (onWorkflowSteps) {
-                                    onWorkflowSteps([...workflowSteps]);
+                                    onWorkflowSteps([...workflowSteps]); // 发送数组的副本
                                 }
                             }
-                        } else if (data.event === 'node_finished') {
-                            console.log('%c[Stream] 收到节点完成事件: node_finished', 'color: #4CAF50; font-weight: bold;');
-                            
-                            // 如果有当前加载中的节点，将其标记为已完成
-                            if (currentLoadingNodeId) {
-                                const nodeIndex = workflowSteps.findIndex(step => step.id === currentLoadingNodeId);
-                                if (nodeIndex !== -1) {
-                                    workflowSteps[nodeIndex].loading = false;
-                                    
-                                    // 发送更新后的工作流步骤
+                        } else if (data.event === 'node_end') {
+                            console.log('%c[Stream] 收到节点结束事件: node_end', 'color: #4CAF50; font-weight: bold;');
+
+                            // 找到对应的步骤并更新状态
+                            const nodeId = data.data.id || currentLoadingNodeId;
+                            if (nodeId) {
+                                const stepIndex = workflowSteps.findIndex(step => step.id === nodeId);
+                                if (stepIndex !== -1) {
+                                    workflowSteps[stepIndex].status = 'completed';
+                                    workflowSteps[stepIndex].endTime = new Date().getTime();
+
+                                    // 计算耗时
+                                    if (workflowSteps[stepIndex].startTime) {
+                                        const duration = workflowSteps[stepIndex].endTime - workflowSteps[stepIndex].startTime;
+                                        workflowSteps[stepIndex].duration = duration;
+                                        // 添加耗时文本
+                                        workflowSteps[stepIndex].durationText = `${(duration / 1000).toFixed(2)}s`;
+                                    }
+
+                                    // 通知UI更新
                                     if (onWorkflowSteps) {
-                                        onWorkflowSteps([...workflowSteps]);
+                                        onWorkflowSteps([...workflowSteps]); // 发送数组的副本
                                     }
                                 }
-                                currentLoadingNodeId = null; // 清空当前加载节点ID
                             }
-                        } else if (data.event === 'workflow_finished') {
-                            console.log('%c[Stream] 收到工作流完成事件: workflow_finished', 'color: #4CAF50; font-weight: bold;');
-                            // 确保所有节点都标记为已完成
-                            workflowSteps = workflowSteps.map(step => ({...step, loading: false}));
-                            
-                            // 发送最终的工作流步骤（全部已完成）
-                            if (onWorkflowSteps) {
-                                onWorkflowSteps([...workflowSteps]);
+
+                            // 清除当前加载的节点ID
+                            if (currentLoadingNodeId === nodeId) {
+                                currentLoadingNodeId = null;
                             }
-                            
-                            workflowSteps = []; // 清空工作流步骤数组
-                            currentLoadingNodeId = null; // 清空当前加载节点ID
-                        } else if (data.event === 'error') {
-                            console.error('%c[Stream] 收到错误事件: error', 'color: #F44336; font-weight: bold;');
-                            onError?.(data.message || '流处理错误');
-                        } else if (data.event === 'ping') {
-                            console.log('%c[Stream] 收到ping事件', 'color: #607D8B; font-style: italic;');
+                        } else if (data.event === 'node_error') {
+                            console.log('%c[Stream] 收到节点错误事件: node_error', 'color: #F44336; font-weight: bold;');
+
+                            // 找到对应的步骤并更新状态
+                            const nodeId = data.data.id || currentLoadingNodeId;
+                            if (nodeId) {
+                                const stepIndex = workflowSteps.findIndex(step => step.id === nodeId);
+                                if (stepIndex !== -1) {
+                                    workflowSteps[stepIndex].status = 'error';
+                                    workflowSteps[stepIndex].error = data.data.error || '执行出错';
+                                    workflowSteps[stepIndex].endTime = new Date().getTime();
+
+                                    // 通知UI更新
+                                    if (onWorkflowSteps) {
+                                        onWorkflowSteps([...workflowSteps]); // 发送数组的副本
+                                    }
+                                }
+                            }
                         }
-                    } catch (e) {
-                        console.error('%c[Stream] 解析流数据失败:', 'color: #F44336; font-weight: bold;', e);
+                    } catch (error) {
+                        console.error('[Stream] 解析数据行时出错:', error, 'Line:', line);
                     }
                 }
             }
-        } catch (streamError) {
-            // 处理流处理过程中的错误
-            console.error('%c[Stream] 流处理过程中出错:', 'color: #F44336; font-weight: bold;', streamError);
-            const errorMsg = streamError.message || '';
 
-            // 扩展中断错误识别条件
-            if (streamError.name === 'AbortError' ||
-                errorMsg.includes('aborted') ||
-                errorMsg.includes('abort') ||
-                errorMsg.includes('BodyStreamBuffer was aborted') ||
-                errorMsg.includes('message channel closed') ||
-                errorMsg.includes('listener indicated an asynchronous response')) {
+            // 流处理完成后的清理工作
+            if (onComplete) {
+                if (buffer.trim()) {
+                    try {
+                        // 处理可能在缓冲区中的最后一行数据
+                        if (buffer.startsWith('data: ')) {
+                            const data = JSON.parse(buffer.substring(6));
+                            // 处理最后一条消息（如果有）
+                            if (data.event === 'message') {
+                                onMessage(data.answer || '');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('[Stream] 处理缓冲区剩余数据时出错:', error);
+                    }
+                }
 
-                console.log('%c[Stream] 请求被中断', 'color: #FF9800; font-weight: bold;');
-                onComplete?.(false, '请求处理过程已中断');
-                return; // 直接返回，不再抛出错误
+                // 确保所有工作流步骤都已完成
+                const unfinishedSteps = workflowSteps.filter(step => step.status === 'loading');
+                if (unfinishedSteps.length > 0) {
+                    for (const step of unfinishedSteps) {
+                        step.status = 'completed';
+                        step.endTime = new Date().getTime();
+
+                        // 计算耗时
+                        if (step.startTime) {
+                            const duration = step.endTime - step.startTime;
+                            step.duration = duration;
+                            step.durationText = `${(duration / 1000).toFixed(2)}s`;
+                        }
+                    }
+
+                    // 最后一次更新UI
+                    if (onWorkflowSteps) {
+                        onWorkflowSteps([...workflowSteps]);
+                    }
+                }
+
+                onComplete(true, '流处理完成');
             }
-            throw streamError; // 只有非中断类错误才重新抛出
-        } finally {
-            // 确保释放资源
-            try {
-                reader.releaseLock();
-                console.log('[Stream] 读取器已释放');
-            } catch (e) {
-                console.warn('[Stream] 释放读取锁时出错:', e);
-            }
+        } catch (error) {
+            console.error('[Stream] 处理流时出错:', error);
+            if (onError) onError(error.message);
+            if (onComplete) onComplete(false, error.message);
         }
-
-        console.log('[Stream] 流处理完成');
-        onComplete?.(true);
     } catch (error) {
-        console.error('[Stream] 流式请求错误:', error);
-
-        // 判断是否是AbortError（请求被中断）
-        if (error.name === 'AbortError' ||
-            error.message.includes('aborted') ||
-            error.message.includes('BodyStreamBuffer was aborted')) {
-            console.log('[Stream] 请求中断错误');
-            onComplete?.(false, '请求已中断');
-        } else {
-            console.error('[Stream] 请求失败错误');
-            onError?.(error.message || '请求失败');
-            onComplete?.(false, error.message);
-        }
+        console.error('[Stream] 创建响应读取器时出错:', error);
+        if (onError) onError(error.message);
+        if (onComplete) onComplete(false, error.message);
     }
 };
 
 /**
- * 封装的请求方法
- * @param {Array} messages - 消息数组
+ * 与模型聊天的主函数
+ * @param {Array} messages - 消息历史
  * @param {Object} callbacks - 回调函数
- * @param {Object} options - 其他选项
- * @returns {Object} 请求结果
+ * @param {Object} options - 选项配置
+ * @returns {Promise} 聊天结果承诺
  */
-export const chatWithModel = async (messages, callbacks = {}, options = {}) => {
+export const chatWithModel = async(messages, callbacks = {}, options = {}) => {
     try {
-        // 直接使用传入的会话ID
-        const conversationId = options.conversation_id || '';
-        const requestOptions = {
-            ...options,
-            conversation_id: conversationId
-        };
+        // 检查是否有回调函数
+        if (!callbacks || typeof callbacks !== 'object') {
+            callbacks = {};
+        }
 
-        console.log('[Chat] 开始聊天请求', {
-            conversationId: conversationId,
-            messageCount: messages.length,
-            hasSignal: !!options.signal
+        // 发送聊天请求
+        const response = await sendChatRequest(messages, {
+            ...options,
+            signal: options.signal
         });
 
-        // 发送请求
-        const responsePromise = sendChatRequest(messages, requestOptions);
-
         // 处理流式响应
-        try {
-            console.log('[Chat] 开始处理流式响应');
-            await handleStreamResponse(responsePromise, callbacks);
-            console.log('[Chat] 流式响应处理成功');
-            return { success: true };
-        } catch (streamError) {
-            // 专门处理流处理过程中的错误
-            console.error('[Chat] 流处理过程中出错:', streamError);
-
-            // 检查是否是中断或通道关闭错误
-            if (streamError.name === 'AbortError' ||
-                streamError.message?.includes('aborted') ||
-                streamError.message?.includes('message channel closed') ||
-                streamError.message?.includes('BodyStreamBuffer was aborted') ||
-                streamError.message?.includes('listener indicated an asynchronous response')) {
-
-                console.log('[Chat] 流处理被中断');
-                callbacks.onComplete?.(false, '请求已中断');
-                return { success: false, aborted: true, error: streamError };
-            }
-
-            // 其他错误传递给回调
-            console.error('[Chat] 流处理失败:', streamError.message || '未知错误');
-            callbacks.onError?.(streamError.message || '流处理失败');
-            callbacks.onComplete?.(false, streamError.message);
-            return { success: false, error: streamError };
-        }
+        handleStreamResponse(response, callbacks);
     } catch (error) {
-        console.error('[Chat] 聊天请求错误:', error);
-
-        // 检查是否是中断或通道关闭错误
-        if (error.name === 'AbortError' ||
-            error.message?.includes('aborted') ||
-            error.message?.includes('message channel closed') ||
-            error.message?.includes('BodyStreamBuffer was aborted') ||
-            error.message?.includes('listener indicated an asynchronous response')) {
-
-            console.log('[Chat] 聊天请求被中断');
-            callbacks.onComplete?.(false, '请求已中断');
-            return { success: false, aborted: true, error };
+        console.error('与模型聊天失败:', error);
+        // 触发错误回调
+        if (callbacks.onError) {
+            callbacks.onError(error.message);
         }
-
-        console.error('[Chat] 聊天请求失败:', error.message || '未知错误');
-        callbacks.onError?.(error.message || '请求失败');
-        callbacks.onComplete?.(false, error.message);
-        return { success: false, error };
+        // 触发结束回调，标记为失败
+        if (callbacks.onComplete) {
+            callbacks.onComplete(false, error.message);
+        }
     }
 };
 
 /**
  * 加载系统提示词
+ * @returns {Promise<string>} 提示词
  */
-export const loadSystemPrompt = async () => {
+export const loadSystemPrompt = async() => {
     try {
-        // 使用标准Fetch API替代uni.request
-        const response = await fetch('/static/files/prompt-copy.json');
-        if (response.ok) {
-            const data = await response.json();
-            return JSON.stringify(data);
-        } else {
-            console.error(`加载系统提示词失败: ${response.status}`);
-            return {
-                role: "您是一个助手",
-                tools: { description: "" },
-                rules: []
-            };
+        // 使用 LangChain API
+        const url = createApiUrl(`/base_agent/system-prompt`, API_CONFIG.langchainBaseURL);
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`获取系统提示词失败: ${response.status}`);
         }
+
+        const data = await response.json();
+        return data.prompt || '';
     } catch (error) {
         console.error('加载系统提示词失败:', error);
-        return {
-            role: "您是一个助手",
-            tools: { description: "" },
-            rules: []
-        };
+        return ''; // 失败时返回空字符串
     }
 };
 
 /**
- * 重置对话
+ * 重置会话
+ * 清空当前会话的所有状态和历史记录
  */
 export const resetConversation = () => {
-    try {
-        return true;
-    } catch (e) {
-        console.error('重置会话出错:', e);
-        return false;
-    }
+    // 可以从这里清除会话相关状态
+    console.log('重置会话');
+
+    // 触发自定义事件
+    const event = new CustomEvent('conversation-reset');
+    document.dispatchEvent(event);
 };

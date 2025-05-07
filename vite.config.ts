@@ -26,7 +26,12 @@ export default defineConfig({
         // target: 'http://192.168.79.122:8083/v1',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/v1/, '')
-      }
+      },
+      '/langchain': {
+        target: 'http://192.168.11.75:8000/',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/langchain/, '')
+      },
     }
   }
 })

@@ -8,46 +8,14 @@
  */
 export const API_CONFIG = {
     baseURL: 'v1', // 使用相对路径，通过Vite代理转发
+    // 新添加的 LangChain API 基础URL
+    langchainBaseURL: '/langchain',
 
     workflowApiKey: 'app-6aRhLAp4zAppCJus5ViMgOsh', // 工作流API密钥（用于标题生成）
     datasetApiKey: 'dataset-DbREngpTedxnPe5ZM0gV7Et7', // 知识库API密钥
-    models: [{
-            id: 'DeepSeek-R1-671B',
-            name: 'DeepSeek-R1-671B（百年金钟，智启未来）',
-            apiKey: 'app-UOyWvnDuuApOkMflgwWwuGYV',
-        },
-        {
-            id: 'ds-v3',
-            name: '金钟 dify 智能体',
-            apiKey: 'app-g3VTn0kdurDWk5M2ehgsmmS9',
-        },
-    ],
-    defaultModel: 'DeepSeek-R1-671B', // 默认选择的模型id
+    models: [], // 改为空数组，将通过API获取
+    defaultModel: '', // 默认选择的模型id将通过API获取
     apiKey: 'app-g3VTn0kdurDWk5M2ehgsmmS9',
-
-    //开发环境
-    // workflowApiKey: 'app-ybMAHYy0gRhmADolVB3L813h', // 工作流API密钥（用于标题生成）
-    // datasetApiKey: 'dataset-y3tb4X8ZjljecJPLQoxsI1m5', // 知识库API密钥
-    // models: [{
-    //     id: 'DeepSeek-R1-671B',
-    //     name: '金钟 dify 智能体',
-    //     apiKey: 'app-2ZT2KgwmU9eJYu04ZJPU3VCB',
-    // }, ],
-    // defaultModel: 'DeepSeek-R1-671B', // 默认选择的模型
-    // apiKey: 'app-2ZT2KgwmU9eJYu04ZJPU3VCB',
-
-    //生产环境
-    // workflowApiKey: 'app-fSrpVWJ5pg1Mig1h3z1Dc7KG', // 工作流API密钥（用于标题生成）
-    // datasetApiKey: 'dataset-c526zDXRlrDQhhpj0BEhimTy', // 知识库API密钥
-    // models: [
-    //   {
-    //     id: 'DeepSeek-R1-671B',
-    //     name: '金钟智能体',
-    //     apiKey: 'app-pimfiiwUhnPd777D7fKfVCSq',
-    //   },
-    // ],
-    // defaultModel: 'DeepSeek-R1-671B', // 默认选择的模型
-    // apiKey: 'app-pimfiiwUhnPd777D7fKfVCSq',
 };
 
 /**
@@ -123,8 +91,45 @@ export const switchModel = modelId => {
 
     // 更新当前模型和对应的API密钥
     API_CONFIG.currentModel = modelId;
-    API_CONFIG.apiKey = model.apiKey;
+    // 不再需要更新API密钥，统一使用同一个密钥
+    // API_CONFIG.apiKey = model.apiKey;
 
     console.log('已切换模型:', model.name);
     return API_CONFIG;
+};
+
+/**
+ * 获取模型列表
+ * @returns {Promise<Array>} 模型列表
+ */
+export const fetchAvailableModels = async() => {
+    try {
+        // 使用新的LangChain API路径
+        const response = await fetch(`${API_CONFIG.langchainBaseURL}/base_agent/available-models`);
+
+        if (!response.ok) {
+            throw new Error(`获取模型列表失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data && data.models && Array.isArray(data.models)) {
+            // 更新API_CONFIG中的模型列表
+            API_CONFIG.models = data.models;
+
+            // 设置默认模型
+            if (data.default_model && !API_CONFIG.currentModel) {
+                API_CONFIG.defaultModel = data.default_model;
+                API_CONFIG.currentModel = data.default_model;
+            }
+
+            return data.models;
+        } else {
+            console.error('获取模型列表格式不正确:', data);
+            return [];
+        }
+    } catch (error) {
+        console.error('获取模型列表请求失败:', error);
+        return [];
+    }
 };
