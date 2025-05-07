@@ -156,8 +156,8 @@ onMounted(() => {
 const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-more', 'rename-conversation', 'pin-conversation']);
 </script>
 
-<style lang="scss" scoped>
-@import '/static/styles/variables.scss';
+<style lang="scss">
+@use '/static/styles/variables.scss' as vars;
 
 .side-panel {
   display: flex;
@@ -166,8 +166,8 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
   width: 300px;
   min-width: 300px;
   transition: all 0.3s ease;
-  background-color: $bg-color-container;
-  border-right: 1px solid $component-stroke;
+  background-color: vars.$bg-color-container;
+  border-right: 1px solid vars.$component-stroke;
   overflow: hidden;
   
   /* 侧边栏收起状态 */
@@ -193,13 +193,13 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
   position: sticky;
   top: 0;
   z-index: 10;
-  background-color: $bg-color-container;
-  padding-bottom: $comp-paddingTB-xs;
-  border-bottom: 1px solid $component-stroke;
+  background-color: vars.$bg-color-container;
+  padding-bottom: vars.$comp-paddingTB-xs;
+  border-bottom: 1px solid vars.$component-stroke;
 }
 
 .feature-item {
-  border-top: 1px dashed $component-stroke;
+  border-top: 1px dashed vars.$component-stroke;
   margin-top: 8px;
   padding-top: 8px;
 }
@@ -213,28 +213,28 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
 .conversation-item {
   display: flex;
   align-items: center;
-  padding: $comp-paddingTB-s $comp-paddingLR-m;
-  margin-bottom: $size-1;
-  border-radius: $radius-default;
+  padding: vars.$comp-paddingTB-s vars.$comp-paddingLR-m;
+  margin-bottom: vars.$size-1;
+  border-radius: vars.$radius-default;
   transition: all 0.3s ease;
   position: relative;
 
   &:hover {
-    background-color: $bg-color-container-hover;
+    background-color: vars.$bg-color-container-hover;
   }
 
   &.active {
-    background-color: $brand-color-light;
-    color: $brand-color;
+    background-color: vars.$brand-color-light;
+    color: vars.$brand-color;
 
     .conversation-icon {
-      color: $brand-color;
+      color: vars.$brand-color;
     }
   }
 
   .conversation-icon {
-    margin-right: $size-2;
-    color: $text-color-secondary;
+    margin-right: vars.$size-2;
+    color: vars.$text-color-secondary;
   }
 
   .conversation-text {
@@ -248,9 +248,9 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
 .load-more-container {
   display: flex;
   justify-content: center;
-  padding: $comp-paddingTB-s 0;
-  margin-top: $comp-margin-s;
-  border-top: 1px solid $component-stroke;
+  padding: vars.$comp-paddingTB-s 0;
+  margin-top: vars.$comp-margin-s;
+  border-top: 1px solid vars.$component-stroke;
 }
 
 .theme-toggle-container {
@@ -260,9 +260,9 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
   right: 0;
   display: flex;
   justify-content: center;
-  padding: $comp-paddingTB-s 0;
-  background-color: $bg-color-container;
-  border-top: 1px solid $component-stroke;
+  padding: vars.$comp-paddingTB-s 0;
+  background-color: vars.$bg-color-container;
+  border-top: 1px solid vars.$component-stroke;
   z-index: 10;
   height: 50px;
 }
@@ -271,15 +271,15 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
   display: flex;
   align-items: center;
   justify-content: center;
-  color: $text-color-secondary;
+  color: vars.$text-color-secondary;
   transition: color 0.3s ease;
   
   &:hover {
-    color: $brand-color;
+    color: vars.$brand-color;
   }
   
   .theme-text {
-    margin-left: $size-2;
+    margin-left: vars.$size-2;
   }
 }
 
@@ -294,14 +294,14 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: $brand-color;
+  background-color: vars.$brand-color;
   color: white;
   border-radius: 0 4px 4px 0;
   z-index: 100;
   transition: right 0.3s ease;
   
   &:hover {
-    background-color: darken($brand-color, 10%);
+    background-color: var(--td-brand-color-hover);
   }
 }
 </style> 

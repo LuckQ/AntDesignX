@@ -146,6 +146,9 @@ import {
     debounce,
     resetConversationState
 } from '/static/api/conversationUtils.js'; // 导入会话处理工具函数
+// TODO云桌面
+// import { useUserStoreWithOut } from '@/store/modules/user';
+// const userStore = useUserStoreWithOut();
 
 /*————————————————————————————————————————————————基础状态变量————————————————————————————————————————————————*/
 const fetchCancel = ref(null); // 用于取消请求的AbortController
@@ -536,12 +539,12 @@ const initChatData = async () => {
     showKnowledgeBase.value = false;
   }
 
-  // 获取系统提示词
-  try {
-    systemPrompt.value = await loadSystemPrompt();
-  } catch (error) {
-    console.error('系统提示词加载失败:', error);
-  }
+//   // 获取系统提示词
+//   try {
+//     systemPrompt.value = await loadSystemPrompt();
+//   } catch (error) {
+//     console.error('系统提示词加载失败:', error);
+//   }
   // 开始加载列表，设置加载状态
   conversationListLoading.value = true;
   // 获取服务器会话列表
@@ -773,7 +776,10 @@ const onStop = async function () {
         // 如果有任务ID，优先使用新的API停止流式响应
         if (taskId) {
             try {
-                const userId = localStorage.getItem('dify_user_id');
+                // TODO云桌面
+                // const userInfo = userStore.getUserInfo;
+                // const userId = userInfo.userId;
+                const userId = 'user123';
                 await stopStreamResponse(taskId, userId);
             } catch (stopError) {
                 console.error('API停止请求失败:', stopError);
@@ -1288,12 +1294,14 @@ const goToDatasetDetail = (datasetId, datasetPath) => {
 </script>
 
 <style lang="scss">
+@use '/static/styles/variables.scss' as vars;
 @use '/static/styles/index.scss';
 @use '/static/styles/animations.scss';
 @use '/static/styles/responsive.scss' as responsive;
 @import '/static/styles/variables.scss';
 
 .app-container {
+    overflow: hidden;
     position: relative;
     width: 100%;
     height: 100%;

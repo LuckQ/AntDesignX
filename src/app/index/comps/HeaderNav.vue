@@ -121,6 +121,7 @@ onMounted(() => {
         switchModel(currentModelId.value);
     }
 });
+
 </script>
 
 <style lang="scss">

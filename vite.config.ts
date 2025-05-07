@@ -20,6 +20,12 @@ export default defineConfig({
         // target: 'http://192.168.79.122:8083',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      '/v1': {
+        target: 'https://api.dify.ai/v1',
+        // target: 'http://192.168.79.122:8083/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/v1/, '')
       }
     }
   }

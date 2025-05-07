@@ -15,14 +15,14 @@
 
       </div>
       <div class="drawer-container">
-        <div class="new-conversation-container">
+        <!-- <div class="new-conversation-container"> -->
           <!-- 添加知识库管理入口 -->
-          <t-list-item @click="goToDatasetManagement" class="conversation-item feature-item"
+          <!-- <t-list-item @click="goToDatasetManagement" class="conversation-item feature-item"
             :class="{ 'active': activeSection === 'knowledge' }">
             <t-icon name="folder" class="conversation-icon" />
             <span class="conversation-text">知识库管理</span>
           </t-list-item>
-        </div>
+        </div> -->
 
         <!-- 可滚动的会话列表 -->
         <div class="conversations-list" ref="conversationsListRef" @scroll="handleScroll">
@@ -257,7 +257,7 @@ const emit = defineEmits(['update:visible', 'select', 'new-conversation', 'load-
   display: flex;
   flex-direction: column;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  // z-index: 1000;
   padding: $comp-paddingTB-m $comp-paddingLR-m $comp-paddingTB-m;
 }
 

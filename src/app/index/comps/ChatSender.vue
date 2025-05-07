@@ -36,14 +36,16 @@ import { ref, onUnmounted } from 'vue';
 import { MessagePlugin, DialogPlugin, Progress as TProgress, Tag as TTag, Space as TSpace, Button as TButton } from 'tdesign-vue-next';
 import { API_CONFIG } from '/static/api/config.js';
 import CustomChatInput from './CustomChatInput.vue';
-
+import {createApiUrl} from '/static/api/config.js'
+// TODO云桌面
+// import { useUserStoreWithOut } from '@/store/modules/user';
+// const userStore = useUserStoreWithOut();
 const props = defineProps({
   loading: {
     type: Boolean,
     default: false
   }
 });
-
 const emit = defineEmits(['send', 'stop']);
 
 const query = ref('');
@@ -212,7 +214,11 @@ const handleFileSelected = async (event: Event) => {
     // 准备FormData
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('user', localStorage.getItem('dify_user_id') || 'anonymous');
+    // TODO云桌面
+    // const userInfo = userStore.getUserInfo;
+    const userInfo = {userId: 'user123'};
+
+    formData.append('user', userInfo.userId || 'anonymous');
 
     // 模拟进度
     const progressInterval = setInterval(() => {
@@ -220,16 +226,15 @@ const handleFileSelected = async (event: Event) => {
         uploadProgress.value += 5;
       }
     }, 100);
-
+    const url = createApiUrl('/files/upload');
     // 发送上传请求
-    const response = await fetch(`${API_CONFIG.baseURL}/files/upload`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_CONFIG.apiKey}`
       },
       body: formData
     });
-
     clearInterval(progressInterval);
     uploadProgress.value = 100;
 

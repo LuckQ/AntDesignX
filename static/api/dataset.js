@@ -34,7 +34,7 @@ const getDatasetApiHeaders = () => {
  * @param {Number} options.limit - 每页数量
  * @returns {Promise<Object>} 包含知识库列表的响应对象
  */
-export const getDatasetList = async (options = {}) => {
+export const getDatasetList = async(options = {}) => {
     const { page = 1, limit = 20 } = options;
     const { signal } = createRequestController();
 
@@ -70,7 +70,7 @@ export const getDatasetList = async (options = {}) => {
  * @param {String} datasetData.provider - 数据提供者，支持"vendor"或"external"
  * @returns {Promise<Object>} 创建的知识库对象
  */
-export const createDataset = async (datasetData) => {
+export const createDataset = async(datasetData) => {
     const { signal } = createRequestController();
 
     try {
@@ -98,7 +98,7 @@ export const createDataset = async (datasetData) => {
  * @param {Object} datasetData - 要更新的知识库数据
  * @returns {Promise<Object>} 更新后的知识库对象
  */
-export const updateDataset = async (datasetId, datasetData) => {
+export const updateDataset = async(datasetId, datasetData) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -129,7 +129,7 @@ export const updateDataset = async (datasetId, datasetData) => {
  * @param {String} datasetId - 知识库ID
  * @returns {Promise<Object>} 删除结果
  */
-export const deleteDataset = async (datasetId) => {
+export const deleteDataset = async(datasetId) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -172,7 +172,7 @@ export const deleteDataset = async (datasetId) => {
  * @param {String} options.keyword - 搜索关键词(可选)
  * @returns {Promise<Object>} 包含文档列表的响应对象
  */
-export const getDocumentList = async (datasetId, options = {}) => {
+export const getDocumentList = async(datasetId, options = {}) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -217,7 +217,7 @@ export const getDocumentList = async (datasetId, options = {}) => {
  * @param {Object} documentData.process_rule - 处理规则
  * @returns {Promise<Object>} 创建的文档对象
  */
-export const createDocumentByText = async (datasetId, documentData) => {
+export const createDocumentByText = async(datasetId, documentData) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -249,7 +249,7 @@ export const createDocumentByText = async (datasetId, documentData) => {
  * @param {FormData} formData - 包含文件和元数据的表单数据
  * @returns {Promise<Object>} 上传结果
  */
-export const createDocumentByFile = async (datasetId, formData) => {
+export const createDocumentByFile = async(datasetId, formData) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -284,7 +284,7 @@ export const createDocumentByFile = async (datasetId, formData) => {
  * @param {Object} documentData - 文档数据
  * @returns {Promise<Object>} 更新结果
  */
-export const updateDocumentByText = async (datasetId, documentId, documentData) => {
+export const updateDocumentByText = async(datasetId, documentId, documentData) => {
     if (!datasetId || !documentId) {
         throw new Error('知识库ID和文档ID不能为空');
     }
@@ -317,7 +317,7 @@ export const updateDocumentByText = async (datasetId, documentId, documentData) 
  * @param {FormData} formData - 包含文件和元数据的表单数据
  * @returns {Promise<Object>} 更新结果
  */
-export const updateDocumentByFile = async (datasetId, documentId, formData) => {
+export const updateDocumentByFile = async(datasetId, documentId, formData) => {
     if (!datasetId || !documentId) {
         throw new Error('知识库ID和文档ID不能为空');
     }
@@ -351,7 +351,7 @@ export const updateDocumentByFile = async (datasetId, documentId, formData) => {
  * @param {String} batch - 上传文档的批次号
  * @returns {Promise<Object>} 包含索引状态的响应对象
  */
-export const getDocumentIndexingStatus = async (datasetId, batch) => {
+export const getDocumentIndexingStatus = async(datasetId, batch) => {
     if (!datasetId || !batch) {
         throw new Error('知识库ID和批次号不能为空');
     }
@@ -382,7 +382,7 @@ export const getDocumentIndexingStatus = async (datasetId, batch) => {
  * @param {String} documentId - 文档ID
  * @returns {Promise<Object>} 删除结果
  */
-export const deleteDocument = async (datasetId, documentId) => {
+export const deleteDocument = async(datasetId, documentId) => {
     if (!datasetId || !documentId) {
         throw new Error('知识库ID和文档ID不能为空');
     }
@@ -425,7 +425,7 @@ export const deleteDocument = async (datasetId, documentId) => {
  * @param {String} options.status - 分段状态(可选)
  * @returns {Promise<Object>} 包含分段列表的响应对象
  */
-export const getDocumentSegments = async (datasetId, documentId, options = {}) => {
+export const getDocumentSegments = async(datasetId, documentId, options = {}) => {
     if (!datasetId || !documentId) {
         throw new Error('知识库ID和文档ID不能为空');
     }
@@ -466,7 +466,7 @@ export const getDocumentSegments = async (datasetId, documentId, options = {}) =
  * @param {Array} segments - 分段数据数组
  * @returns {Promise<Object>} 创建结果
  */
-export const createDocumentSegments = async (datasetId, documentId, segments) => {
+export const createDocumentSegments = async(datasetId, documentId, segments) => {
     if (!datasetId || !documentId) {
         throw new Error('知识库ID和文档ID不能为空');
     }
@@ -500,7 +500,7 @@ export const createDocumentSegments = async (datasetId, documentId, segments) =>
  * @param {Object} segment - 分段数据
  * @returns {Promise<Object>} 更新结果
  */
-export const updateDocumentSegment = async (datasetId, documentId, segmentId, segment) => {
+export const updateDocumentSegment = async(datasetId, documentId, segmentId, segment) => {
     if (!datasetId || !documentId || !segmentId) {
         throw new Error('知识库ID、文档ID和分段ID不能为空');
     }
@@ -533,7 +533,7 @@ export const updateDocumentSegment = async (datasetId, documentId, segmentId, se
  * @param {String} segmentId - 分段ID
  * @returns {Promise<Object>} 删除结果
  */
-export const deleteDocumentSegment = async (datasetId, documentId, segmentId) => {
+export const deleteDocumentSegment = async(datasetId, documentId, segmentId) => {
     if (!datasetId || !documentId || !segmentId) {
         throw new Error('知识库ID、文档ID和分段ID不能为空');
     }
@@ -564,7 +564,7 @@ export const deleteDocumentSegment = async (datasetId, documentId, segmentId) =>
  * @param {String} documentId - 文档ID
  * @returns {Promise<Object>} 文件信息
  */
-export const getUploadFile = async (datasetId, documentId) => {
+export const getUploadFile = async(datasetId, documentId) => {
     if (!datasetId || !documentId) {
         throw new Error('知识库ID和文档ID不能为空');
     }
@@ -595,7 +595,7 @@ export const getUploadFile = async (datasetId, documentId) => {
  * @param {Object} retrievalParams - 检索参数
  * @returns {Promise<Object>} 检索结果
  */
-export const retrieveDataset = async (datasetId, retrievalParams) => {
+export const retrieveDataset = async(datasetId, retrievalParams) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -626,7 +626,7 @@ export const retrieveDataset = async (datasetId, retrievalParams) => {
  * @param {String} datasetId - 知识库ID
  * @returns {Promise<Object>} 元数据列表
  */
-export const getDatasetMetadata = async (datasetId) => {
+export const getDatasetMetadata = async(datasetId) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -657,7 +657,7 @@ export const getDatasetMetadata = async (datasetId) => {
  * @param {Object} metadata - 元数据
  * @returns {Promise<Object>} 创建结果
  */
-export const createDatasetMetadata = async (datasetId, metadata) => {
+export const createDatasetMetadata = async(datasetId, metadata) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -690,7 +690,7 @@ export const createDatasetMetadata = async (datasetId, metadata) => {
  * @param {Object} metadata - 更新数据
  * @returns {Promise<Object>} 更新结果
  */
-export const updateDatasetMetadata = async (datasetId, metadataId, metadata) => {
+export const updateDatasetMetadata = async(datasetId, metadataId, metadata) => {
     if (!datasetId || !metadataId) {
         throw new Error('知识库ID和元数据ID不能为空');
     }
@@ -722,7 +722,7 @@ export const updateDatasetMetadata = async (datasetId, metadataId, metadata) => 
  * @param {String} metadataId - 元数据ID
  * @returns {Promise<Object>} 删除结果
  */
-export const deleteDatasetMetadata = async (datasetId, metadataId) => {
+export const deleteDatasetMetadata = async(datasetId, metadataId) => {
     if (!datasetId || !metadataId) {
         throw new Error('知识库ID和元数据ID不能为空');
     }
@@ -753,7 +753,7 @@ export const deleteDatasetMetadata = async (datasetId, metadataId) => {
  * @param {String} action - 操作，enable或disable
  * @returns {Promise<Object>} 操作结果
  */
-export const toggleBuiltInMetadata = async (datasetId, action) => {
+export const toggleBuiltInMetadata = async(datasetId, action) => {
     if (!datasetId || !action) {
         throw new Error('知识库ID和操作类型不能为空');
     }
@@ -788,7 +788,7 @@ export const toggleBuiltInMetadata = async (datasetId, action) => {
  * @param {Array} operationData - 操作数据
  * @returns {Promise<Object>} 更新结果
  */
-export const updateDocumentsMetadata = async (datasetId, operationData) => {
+export const updateDocumentsMetadata = async(datasetId, operationData) => {
     if (!datasetId) {
         throw new Error('知识库ID不能为空');
     }
@@ -818,7 +818,7 @@ export const updateDocumentsMetadata = async (datasetId, operationData) => {
  * 获取知识库配置选项
  * @returns {Promise<Object>} 配置选项
  */
-export const getDatasetConfigOptions = async () => {
+export const getDatasetConfigOptions = async() => {
     const { signal } = createRequestController();
 
     try {
@@ -837,4 +837,4 @@ export const getDatasetConfigOptions = async () => {
         console.error('获取知识库配置选项错误:', error);
         throw error;
     }
-}; 
+};

@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-
+import img from "/static/files/favicon.png"
 // 定义组件属性
 const props = defineProps({
   // 接收外部传入的建议问题
@@ -40,7 +40,7 @@ const props = defineProps({
   // 添加Logo图片路径属性
   logoSrc: {
     type: String,
-    default: "/static/files/favicon.png"
+    default: img
   }
 });
 
