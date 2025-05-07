@@ -896,8 +896,11 @@ const handleModelRequest = async (inputValue, files = []) => {
         };
 
         await chatWithModel(
-            messages,
             {
+                // 消息内容（使用当前用户输入作为prompt）
+                prompt: currentUserMessage,
+                files: files.length > 0 ? files : [],
+                conversationId: currentConversationId.value || '',
                 // 思考内容
                 onReasoning: (reasoningText) => {
                     // 检查是否已中断 - 通过检查loading状态替代直接检查signal
@@ -975,6 +978,8 @@ const handleModelRequest = async (inputValue, files = []) => {
                         // 请求成功完成，考虑自动重命名对话
                         // 只有当有会话ID时才尝试重命名
                         if (currentConversationId.value) {
+                            // 暂时注释自动重命名功能，因为后端API不支持auto_generate参数
+                            /*
                             // 使用改进的自动重命名函数，带上当前消息列表
                             autoRenameConversationIfNeeded(currentConversationId.value, {
                                 messages: chatList.value,
@@ -1000,6 +1005,35 @@ const handleModelRequest = async (inputValue, files = []) => {
                             }).catch(error => {
                                 console.error('自动重命名过程出错:', error);
                             });
+                            */
+                            
+                            // 使用第一条用户消息作为会话名称
+                            const userMessages = chatList.value.filter(msg => msg.role === 'user');
+                            if (userMessages.length > 0) {
+                                const firstUserMessage = userMessages[userMessages.length - 1]; // 取最后一个（最早的）用户消息
+                                const title = firstUserMessage.content?.trim().substring(0, 30) || '新对话';
+                                
+                                // 调用重命名函数并明确提供标题
+                                renameConversation(currentConversationId.value, { name: title })
+                                    .then(result => {
+                                        if (result.success) {
+                                            console.log('使用用户消息重命名成功:', title);
+                                            // 更新本地会话列表中的名称
+                                            conversationList.value = conversationList.value.map(conversation => {
+                                                if (conversation.id === currentConversationId.value) {
+                                                    return {
+                                                        ...conversation,
+                                                        name: title
+                                                    };
+                                                }
+                                                return conversation;
+                                            });
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('重命名会话失败:', error);
+                                    });
+                            }
                         }
                     }
 
@@ -1039,9 +1073,11 @@ const handleModelRequest = async (inputValue, files = []) => {
                 onWorkflowSteps: (steps) => {
                     // 使用提取的处理函数
                     handleWorkflowSteps(steps, chatList, loading, firstTokenReceived);
-                }
-            },
-            requestOptions
+                },
+                
+                // 添加信号以支持请求中断
+                signal: signal
+            }
         );
     } catch (err) {
         console.error('聊天请求失败:', err);

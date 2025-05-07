@@ -1,22 +1,8 @@
 <template>
     <t-chat-item :avatar="avatar" :name="name" :role="role" :datetime="datetime" :content="content">
         <template #content cla>
-
-            <t-collapse :expand-icon="null" :borderless="true" :default-expand-all="isWorkflowCompleted"
-                class="transparent-collapse" v-if="role === 'assistant' && workflowSteps && workflowSteps.length > 0">
-                <t-collapse-panel value="0" :header="getCollapseHeader(workflowSteps)">
-                    <t-timeline mode="same" :theme="dot" class="workflow-timeline">
-                        <t-timeline-item v-for="(step, stepIndex) in workflowSteps" :key="stepIndex" :content="step.title"
-                            :dot="getNodeDot(step.node_type, step.loading)" :dot-color="getNodeColor(step.node_type)">
-                            <div v-if="step.loading" class="step-loading">
-                                <span>{{ step.title }}</span><span class="loading-dots">{{ getLoadingDots() }}</span>
-                            </div>
-                            <div v-else-if="step.content">{{ step.content }}</div>
-                        </t-timeline-item>
-                    </t-timeline>
-                </t-collapse-panel>
-            </t-collapse>
-
+            <!-- 工作流程展示区域 - 使用独立组件 -->
+            <workflow-steps v-if="role === 'assistant' && workflowSteps && workflowSteps.length > 0" :steps="workflowSteps" />
 
             <!-- 只有助手消息且有思考内容才显示思考框 -->
             <t-chat-reasoning v-if="reasoning && reasoning.trim() && role === 'assistant' && reasoning !== '思考中...'"
@@ -31,6 +17,7 @@
                 </template>
                 <t-chat-content :content="reasoning || ''" />
             </t-chat-reasoning>
+            
             <!-- 显示消息内容，如果没有则显示占位 -->
             <t-chat-content v-if="content && content.trim().length > 0" :content="content" class="zero-margins" />
 
@@ -62,7 +49,7 @@
         <!-- 操作按钮，只对助手消息显示 -->
         <template #actions>
             <chat-action class="chat-actions-container" v-if="!isStreamLoad && role === 'assistant'" :is-good="isGood" :is-bad="isBad"
-                :content="content || ''" @operation="handleOperation" />    
+                :content="content || ''" @operation="handleOperation" />
         </template>
     </t-chat-item>
 </template>
@@ -70,6 +57,7 @@
 <script setup lang="jsx">
 import { defineProps, defineEmits, ref, onMounted, onUnmounted, computed } from 'vue';
 import ChatAction from './ChatAction.vue';
+import WorkflowSteps from './WorkflowSteps.vue';
 
 // 组件属性
 const props = defineProps({
@@ -139,9 +127,6 @@ const handleOperation = (type, options) => {
     emit('operation', type, options);
 };
 
-// 默认时间轴样式
-const dot = ref('default');
-
 // 动态省略号状态
 const dotsCount = ref(1);
 let dotsInterval = null;
@@ -158,11 +143,6 @@ onUnmounted(() => {
     if (dotsInterval) {
         clearInterval(dotsInterval);
     }
-});
-
-// 计算属性：判断工作流是否已完成
-const isWorkflowCompleted = computed(() => {
-    return props.workflowSteps && props.workflowSteps.length > 0 && !props.workflowSteps.some(step => step.loading);
 });
 
 // 获取文件扩展名
@@ -271,53 +251,6 @@ const getFileTypeClass = (extension) => {
     return `file-type-${fileType}`;
 };
 
-// 添加：节点类型到图标的映射
-const nodeTypeToIcon = {
-    'default': 'check-circle-filled', // 默认节点
-    'start': 'play-circle-filled',    // 开始节点
-    'http': 'link',                   // HTTP请求节点
-    'condition': 'swap',              // 条件分支节点
-    'time': 'time',                   // 时间相关节点
-    'search': 'search',               // 搜索节点
-    'extract': 'filter',              // 参数提取节点
-    'web': 'internet',                // Web搜索节点
-    'file': 'file',                   // 文件节点
-    'model': 'root-list',             // 模型节点
-    'reply': 'chat',                  // 回复节点
-    'error': 'error-circle',          // 错误节点
-};
-
-// 添加：节点类型到颜色的映射
-const nodeTypeToColor = {
-    'default': 'primary',            // 默认节点颜色
-    'start': 'primary',              // 开始节点颜色
-    'error': 'error',                // 错误节点颜色
-    'condition': 'warning',          // 条件分支节点颜色
-    'model': 'success',              // 模型节点颜色
-    'reply': 'success',              // 回复节点颜色
-};
-
-// 添加：获取节点图标函数 - 使用JSX方式
-const getNodeIcon = (nodeType) => {
-    const iconName = nodeTypeToIcon[nodeType] || nodeTypeToIcon.default;
-    return iconName;
-};
-
-// 添加：获取节点颜色函数
-const getNodeColor = (nodeType) => {
-    return nodeTypeToColor[nodeType] || 'primary';
-};
-
-// 使用JSX创建自定义dot
-const getNodeDot = (nodeType, isLoading) => {
-    const color = `var(--td-${getNodeColor(nodeType)}-color)`;
-    const iconName = getNodeIcon(nodeType);
-
-    return () => (
-        <t-icon name={iconName} size="medium" color={color} />
-    );
-};
-
 // 添加：获取动态省略号函数
 const getLoadingDots = () => {
     const fullDots = '......'; // 6个点
@@ -337,31 +270,6 @@ const formatFileName = (fileName) => {
     if (name.length <= 5) return fileName; // 如果名称部分已经很短，保留全名
     return name.slice(0, 5) + '...' + extension;
 };
-
-// 添加：获取折叠面板标题函数
-const getCollapseHeader = (steps) => {
-    const lastStep = steps[steps.length - 1];
-    // 检查是否所有步骤都已完成（没有正在加载的步骤）
-    const isCompleted = !steps.some(step => step.loading);
-
-    if (isCompleted) {
-        // 流程完成后显示"执行过程"
-        return (
-            <div class="workflow-header">
-                <t-icon name={getNodeIcon(lastStep.node_type)} color={`var(--td-${getNodeColor(lastStep.node_type)}-color)`} />
-                <span>执行过程</span>
-            </div>
-        );
-    } else {
-        // 流程未完成，显示最后一步的标题和加载动画
-        return (
-            <div class="workflow-header">
-                <t-icon name={getNodeIcon(lastStep.node_type)} color={`var(--td-${getNodeColor(lastStep.node_type)}-color)`} />
-                <span>{lastStep.title + getLoadingDots()}</span>
-            </div>
-        );
-    }
-};
 </script>
 
 <style lang="scss">
@@ -375,33 +283,6 @@ const getCollapseHeader = (steps) => {
 /* 消息内容容器 */
 :deep(.t-chat__bubble) {
     transition: all 0.3s ease, width 0.3s ease, max-width 0.3s ease;
-}
-
-/* 透明折叠面板 */
-.transparent-collapse {
-    background-color: transparent;
-    transition: all 0.3s ease;
-
-    :deep(.t-collapse-panel__header) {
-        background-color: transparent;
-        transition: all 0.3s ease;
-    }
-
-    :deep(.t-collapse-panel__content) {
-        background-color: transparent;
-        transition: all 0.3s ease;
-    }
-}
-
-/* 工作流时间线 */
-.workflow-timeline {
-    width: 100%;
-    margin-top: 8px;
-    transition: all 0.3s ease;
-
-    .t-timeline-item {
-        transition: all 0.3s ease;
-    }
 }
 
 /* 思考框样式 */
@@ -505,7 +386,7 @@ const getCollapseHeader = (steps) => {
         margin-right: 4px;
     }
 
-    /* 通用文件 - 灰色 */
+    /* 文件类型样式 */
     &.file-type-generic {
         background-color: var(--td-gray-color-1, #f3f3f3);
         border: 1px solid var(--td-gray-color-3, #dcdcdc);
@@ -515,7 +396,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* 文本文档 (txt) - 保持蓝色 */
     &.file-type-text {
         background-color: var(--td-brand-color-light, rgba($brand-color, 0.1));
         border: 1px solid var(--td-brand-color-2, rgba($brand-color, 0.3));
@@ -525,7 +405,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* Markdown 文档 - 改为灰色 */
     &.file-type-markdown {
         background-color: var(--td-gray-color-1, #f3f3f3);
         border: 1px solid var(--td-gray-color-3, #dcdcdc);
@@ -535,7 +414,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* PDF 文档 - 红色 */
     &.file-type-pdf {
         background-color: var(--td-error-color-1, rgba($error-color, 0.1));
         border: 1px solid var(--td-error-color-2, rgba($error-color, 0.3));
@@ -545,7 +423,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* 代码文件 - 橙色 */
     &.file-type-code {
         background-color: var(--td-warning-color-1, rgba($warning-color, 0.1));
         border: 1px solid var(--td-warning-color-2, rgba($warning-color, 0.3));
@@ -555,7 +432,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* 电子表格 - 绿色 */
     &.file-type-spreadsheet {
         background-color: var(--td-success-color-1, rgba($success-color, 0.1));
         border: 1px solid var(--td-success-color-2, rgba($success-color, 0.3));
@@ -565,7 +441,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* Word文档 - 蓝色 */
     &.file-type-document {
         background-color: var(--td-brand-color-light, rgba($brand-color, 0.1));
         border: 1px solid var(--td-brand-color-2, rgba($brand-color, 0.3));
@@ -575,7 +450,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* 图片 - 紫色 */
     &.file-type-image {
         background-color: var(--td-purple-color-1, rgba(#722ed1, 0.1));
         border: 1px solid var(--td-purple-color-3, rgba(#722ed1, 0.3));
@@ -585,7 +459,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* 音频 - 青色 */
     &.file-type-audio {
         background-color: var(--td-cyan-color-1, rgba(#13c2c2, 0.1));
         border: 1px solid var(--td-cyan-color-3, rgba(#13c2c2, 0.3));
@@ -595,7 +468,6 @@ const getCollapseHeader = (steps) => {
         }
     }
 
-    /* 视频 - 品红 */
     &.file-type-video {
         background-color: var(--td-magenta-color-1, rgba(#eb2f96, 0.1));
         border: 1px solid var(--td-magenta-color-3, rgba(#eb2f96, 0.3));
@@ -610,41 +482,17 @@ const getCollapseHeader = (steps) => {
     padding: 11px 6px 12px 8px;
 }
 
-/* 步骤加载中 */
-.step-loading {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    transition: all 0.3s ease;
-}
-
-/* 加载点动画 */
-.loading-dots {
-    width: 24px;
-    display: inline-block;
-    transition: all 0.3s ease;
-}
-
 /* 加载空间 */
 .loading-space {
     transition: all 0.3s ease;
     width: 100%;
 }
 
-/* 头像相关样式 */
-:deep(.t-tag .t-icon) {
-    width: 14px;
-    height: 14px;
-}
-
-/* 工作流标题 */
-.workflow-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    
-    .t-icon {
-        font-size: 16px;
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .file-tag {
+        min-width: 80px;
+        margin-left: -50px;
     }
 }
 </style>

@@ -700,17 +700,21 @@ export const renameConversation = async(conversationId, options = {}) => {
         const requestBody = {
             session_id: conversationId,
             user_id: userId,
-            title: options.name // 使用name作为新标题
+            title: options.name || '新对话' // 始终提供title，使用name或默认值
         };
 
         // 如果是自动生成标题，添加auto_generate标志
         if (options.auto_generate) {
             requestBody.auto_generate = true;
+            // 确保title字段存在，即使是auto_generate模式也需要提供一个初始title
+            if (!requestBody.title) {
+                requestBody.title = '新对话';
+            }
         }
 
         console.log(`[重命名] 尝试重命名会话 ${conversationId}`, {
             auto_generate: options.auto_generate,
-            title: options.name,
+            title: requestBody.title,
             API地址: url.toString()
         });
 
@@ -886,5 +890,71 @@ export const getSuggestedQuestions = async messageId => {
     } catch (error) {
         console.error('获取建议问题失败:', error);
         return [];
+    }
+};
+
+/**
+ * 创建新的聊天会话
+ * @param {string} userId - 用户ID
+ * @param {Object} options - 创建选项
+ * @returns {Promise<Object>} - 返回包含session_id的对象
+ */
+export const createChat = async(userId, options = {}) => {
+    try {
+        const user_id = userId || ensureUserId();
+        const url = createApiUrl(`/base_agent/create-chat`, API_CONFIG.langchainBaseURL);
+
+        // 默认选项
+        const defaultOptions = {
+            tools_enabled: true,
+            tool_type: "local",
+            model_name: API_CONFIG.currentModel || "default",
+            model_provider: "default",
+            enable_retrieval: false,
+            title: "新对话"
+        };
+
+        // 合并默认选项和传入的选项
+        const requestBody = {
+            user_id,
+            ...defaultOptions,
+            ...options
+        };
+
+        console.log('创建会话请求:', requestBody);
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`创建会话失败: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('创建会话返回:', data);
+
+        // 返回标准化的响应结果
+        return {
+            success: data.status === 'success' || !!data.session_id,
+            session_id: data.session_id || data.data.session_id,
+            user_id: data.user_id || user_id,
+            status: data.status || 'success',
+            message: data.message || '会话已成功创建',
+            features: data.features || {}
+        };
+    } catch (error) {
+        console.error('创建会话错误:', error);
+        // 返回错误信息
+        return {
+            success: false,
+            error: error.message,
+            message: error.message || '创建会话失败'
+        };
     }
 };
