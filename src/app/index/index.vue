@@ -551,8 +551,8 @@ const initChatData = async () => {
   try {
     // 使用新参数调用，每次加载20条对话
     const serverConversations = await getServerConversations({
-      limit: 20,
-      sort_by: '-updated_at'
+      limit: 20, // limit 参数在后端对应 page_size
+      // sort_by: '-updated_at' // 后端API已默认按更新时间排序，无需前端传递
     });
     // 确保返回的数据是数组
     if (serverConversations && Array.isArray(serverConversations)) {
@@ -563,32 +563,33 @@ const initChatData = async () => {
 
       // 只有当不在知识库页面时，才加载会话历史
       if (!showKnowledgeBase.value) {
-        // 获取默认会话ID
-        const defaultConversationId = await getCurrentConversation();
-        if (defaultConversationId) {
-          currentConversationId.value = defaultConversationId;
-          isNewConversation.value = false;
-          await loadConversationHistory(defaultConversationId);
+        // 优化：直接从已获取的会话列表中确定默认会话
+        if (serverConversations.length > 0) {
+          // 检查URL中是否有指定的会话ID
+          const urlConversationId = urlParams.get('conversation');
+          if (urlConversationId && serverConversations.some(c => c.id === urlConversationId)) {
+            // 如果URL指定了有效的会话ID，则使用它
+            currentConversationId.value = urlConversationId;
+            isNewConversation.value = false;
+            await loadConversationHistory(urlConversationId);
+          } else {
+            // 否则，使用列表中的第一个会话作为默认会话
+            const defaultConversation = serverConversations[0];
+            currentConversationId.value = defaultConversation.id;
+            isNewConversation.value = false;
+            await loadConversationHistory(defaultConversation.id);
+          }
         } else {
-          // 如果没有会话，创建新对话
+          // 如果没有会话，创建新对话状态
           currentConversationId.value = '';
           chatList.value = [];
           isNewConversation.value = true;
-          // 确保重置历史加载状态，以便显示欢迎页面
-          historyLoading.value = false;
-        }
-
-        // 如果会话列表为空数组，直接显示欢迎页面
-        if (serverConversations.length === 0) {
-          currentConversationId.value = '';
-          chatList.value = [];
-          isNewConversation.value = true;
-          historyLoading.value = false;
+          historyLoading.value = false; // 确保欢迎页面正确显示
         }
       }
     } else {
       console.error('服务器返回的会话列表数据格式不正确:', serverConversations);
-      // 创建新会话
+      // 创建新会话状态
       currentConversationId.value = '';
       chatList.value = [];
       isNewConversation.value = true;
@@ -596,7 +597,7 @@ const initChatData = async () => {
     }
   } catch (error) {
     console.error('获取服务器会话列表失败:', error);
-    // 创建新会话
+    // 创建新会话状态
     currentConversationId.value = '';
     chatList.value = [];
     isNewConversation.value = true;

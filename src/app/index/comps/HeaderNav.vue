@@ -297,16 +297,4 @@ onMounted(() => {
         }
     }
 }
-
-:root[theme-mode="light"] {
-    .fixed-header {
-        // background-color: $gray-color-1 !important;
-    }
-}
-
-:root[theme-mode="dark"] {
-    .fixed-header {
-        // background-color: $bg-color-container !important;
-    }
-}
 </style>

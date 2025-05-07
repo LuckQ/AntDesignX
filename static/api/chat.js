@@ -767,14 +767,13 @@ export const renameConversation = async(conversationId, options = {}) => {
 /**
  * 删除会话
  * @param {String} conversationId - 会话ID
- * @returns {Promise<Object>} 请求结果
+ * @returns {Promise<Object>} 请求结果，包含状态和消息
  */
 export const deleteConversation = async conversationId => {
     const userId = ensureUserId();
 
     try {
-        // 使用 LangChain API 的新接口
-        // 使用 createApiUrl 函数正确构建 URL
+        // 使用 LangChain API 的删除会话接口
         const url = createApiUrl(`/base_agent/delete-chat`, API_CONFIG.langchainBaseURL);
 
         // 创建请求体
@@ -786,7 +785,7 @@ export const deleteConversation = async conversationId => {
         console.log('删除会话请求:', requestBody);
 
         const response = await fetch(url, {
-            method: 'DELETE',
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -800,10 +799,23 @@ export const deleteConversation = async conversationId => {
 
         const data = await response.json();
         console.log('删除会话返回:', data);
-        return data;
+
+        // 返回标准化的响应结果
+        return {
+            success: data.status === 'success',
+            session_id: data.session_id,
+            user_id: data.user_id,
+            status: data.status,
+            message: data.message || '会话已成功删除'
+        };
     } catch (error) {
         console.error('删除会话错误:', error);
-        throw error;
+        // 返回错误信息
+        return {
+            success: false,
+            error: error,
+            message: error.message || '删除会话失败'
+        };
     }
 };
 
