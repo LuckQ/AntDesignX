@@ -21,6 +21,13 @@
             <!-- 显示消息内容，如果没有则显示占位 -->
             <t-chat-content v-if="content && content.trim().length > 0" :content="content" class="zero-margins" />
 
+            <!-- 工作流展示后，如果没有内容且正在加载，显示加载动画 -->
+            <div class="loading-space" v-else-if="role === 'assistant' && loading && workflowSteps && workflowSteps.length > 0">
+                <t-space>
+                    <t-chat-loading animation="moving" text="生成回答中..." />
+                </t-space>
+            </div>
+
             <!-- 文件展示 -->
             <div class="message-files" v-if="files && files.length > 0">
                 <div class="files-scroll-container">
