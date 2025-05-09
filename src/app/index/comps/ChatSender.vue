@@ -59,7 +59,7 @@ const uploadedFiles = ref<Array<{ id: string, name: string, size: number, extens
 const supportedExtensions = ['txt', 'md', 'mdx', 'pdf', 'html', 'xlsx', 'xls', 'docx', 'csv', 'htm', 'markdown'];
 
 // 最大文件大小(字节)
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 5MB
 
 // 最大文件数量
 const MAX_FILES = 10;
