@@ -1,49 +1,64 @@
 <template>
-    <div class="iframe-container">
-        <iframe :src="iframeUrl" frameborder="0" width="100%" height="100%"></iframe>
+    <div class="shell">
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <button @click="send">向 B 发送时间戳</button>
+        <button @click="toggle">{{ visible ? '隐藏 B' : '显示 B' }}</button>
+        <span>{{ status }}</span>
+      </div>
+  
+      <!-- iframe：始终存在，但用 v-show 隐藏，首屏就开始预加载 -->
+      <transition name="fade">
+        <iframe
+          v-show="visible"       
+          ref="frameB"
+          :src="bUrl"
+          class="b-frame"
+          loading="eager"         
+        ></iframe>
+      </transition>
     </div>
-</template>
-
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
-
-// 创建响应式的 iframe URL
-const iframeUrl = ref('');
-
-// 生成带有 token 的 URL
-const generateUrl = () => {
-    // 使用当前时间戳作为 token
-    const token = new Date().getTime().toString();
-    // 构建完整的 URL，包含 token 参数
-    return `http://localhost:5173/?token=${token}`;
-};
-
-// 组件挂载时生成 URL
-onMounted(() => {
-    iframeUrl.value = generateUrl();
-    
-    // 可选：定时更新 token（如果需要）
-    // setInterval(() => {
-    //     iframeUrl.value = generateUrl();
-    // }, 60000); // 每分钟更新一次
-});
-</script>
-
-<style scoped lang="scss">
-.iframe-container {
-    width: 100%;
-    height: 100vh; // 使用视口高度，让 iframe 填满整个页面
-    overflow: hidden;
-    position: relative;
-    
-    iframe {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border: none;
+  </template>
+  
+  <script setup>
+  import { ref, onMounted } from 'vue'
+  
+  const bUrl   = 'http://localhost:5173/crm'   // 子应用 URL
+  const frameB = ref(null)
+  const status = ref('B 未就绪')
+  const visible = ref(false)               // **** 初始隐藏 ****
+  
+  /* ==== MessageChannel 双向通信 ==== */
+  const channel = new MessageChannel()
+  
+  onMounted(() => {
+    frameB.value.addEventListener('load', () => {
+      // 把 port2 发送过去，建立专属通道
+      frameB.value.contentWindow.postMessage({ cmd: 'init-port' }, bUrl, [channel.port2])
+    })
+  
+    channel.port1.onmessage = (e) => {
+      if (e.data.cmd === 'b-ready') status.value = 'B 已就绪'
+      else if (e.data.cmd === 'reply') console.log('来自 B：', e.data.payload)
     }
-}
-</style>
-
+  })
+  
+  function send () {
+    channel.port1.postMessage({ cmd: 'data', payload: Date.now() })
+  }
+  
+  function toggle () {
+    visible.value = !visible.value
+  }
+  </script>
+  
+  <style scoped>
+  .shell   { height: 100vh; display: flex; flex-direction: column; }
+  .toolbar { padding: 12px; background: #eef; display: flex; gap: 8px; align-items: center; }
+  .b-frame { flex: 1; width: 100%; border: none; }
+  
+  /* 可选淡入淡出动画 */
+  .fade-enter-active, .fade-leave-active { transition: opacity .25s ease; }
+  .fade-enter-from,  .fade-leave-to      { opacity: 0; }
+  </style>
+  
