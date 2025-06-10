@@ -3,12 +3,13 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/app/index'
+    redirect: '/app/father'
+    // redirect: '/app/index'
   },
-  {
-    path: '/test/index',
-    name: 'TestIndex',
-    component: () => import('../app/test/index.vue')
+   {
+    path: '/app/father',
+    name: 'AppFather',
+    component: () => import('../app/father/father.vue')
   },
   {
     path: '/app/index',
